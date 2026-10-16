@@ -1,0 +1,6 @@
+# auto-update pipeline scratch files (never committed)
+UPSTREAM_REPORT.md
+RUN_SUMMARY.md
+review*.json
+validate.txt
+__pycache__/

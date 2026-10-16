@@ -1,0 +1,106 @@
+{
+  "_comment": "Upstream sources the auto-update loop watches. Kinds: changelog (markdown with '## <version>' headings), page (text page, diffed), gh_release (latest GitHub release tag), gh_advisories (GitHub Advisory Database entries for a package). Add a source here and the next scheduled run picks it up. Only https URLs on hosts listed in allowed_hosts are fetched.",
+  "allowed_hosts": [
+    "raw.githubusercontent.com",
+    "api.github.com",
+    "code.claude.com",
+    "docs.claude.com",
+    "genai.owasp.org",
+    "owasp.org",
+    "www.nist.gov",
+    "atlas.mitre.org"
+  ],
+  "sources": [
+    {
+      "id": "claude-code-changelog",
+      "kind": "changelog",
+      "category": "claude-code-features",
+      "url": "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md"
+    },
+    {
+      "id": "claude-code-security-advisories",
+      "kind": "gh_advisories",
+      "category": "ai-security",
+      "ecosystem": "npm",
+      "package": "@anthropic-ai/claude-code"
+    },
+    {
+      "id": "claude-code-action-release",
+      "kind": "gh_release",
+      "category": "automation",
+      "repo": "anthropics/claude-code-action"
+    },
+    {
+      "id": "docs-subagents",
+      "kind": "page",
+      "category": "claude-code-features",
+      "url": "https://code.claude.com/docs/en/sub-agents.md"
+    },
+    {
+      "id": "docs-hooks",
+      "kind": "page",
+      "category": "claude-code-features",
+      "url": "https://code.claude.com/docs/en/hooks.md"
+    },
+    {
+      "id": "docs-settings",
+      "kind": "page",
+      "category": "claude-code-features",
+      "url": "https://code.claude.com/docs/en/settings.md"
+    },
+    {
+      "id": "docs-slash-commands",
+      "kind": "page",
+      "category": "claude-code-features",
+      "url": "https://code.claude.com/docs/en/slash-commands.md"
+    },
+    {
+      "id": "docs-skills",
+      "kind": "page",
+      "category": "claude-code-features",
+      "url": "https://code.claude.com/docs/en/skills.md"
+    },
+    {
+      "id": "docs-memory",
+      "kind": "page",
+      "category": "claude-code-features",
+      "url": "https://code.claude.com/docs/en/memory.md"
+    },
+    {
+      "id": "docs-security",
+      "kind": "page",
+      "category": "ai-security",
+      "url": "https://code.claude.com/docs/en/security.md"
+    },
+    {
+      "id": "docs-iam-permissions",
+      "kind": "page",
+      "category": "ai-security",
+      "url": "https://code.claude.com/docs/en/iam.md"
+    },
+    {
+      "id": "owasp-llm-top10",
+      "kind": "page",
+      "category": "ai-security",
+      "url": "https://genai.owasp.org/llm-top-10/"
+    },
+    {
+      "id": "owasp-agentic-top10",
+      "kind": "page",
+      "category": "ai-security",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
+    },
+    {
+      "id": "mitre-atlas-data",
+      "kind": "gh_release",
+      "category": "ai-security",
+      "repo": "mitre-atlas/atlas-data"
+    },
+    {
+      "id": "nist-ai-rmf",
+      "kind": "page",
+      "category": "ai-security",
+      "url": "https://www.nist.gov/itl/ai-risk-management-framework"
+    }
+  ]
+}

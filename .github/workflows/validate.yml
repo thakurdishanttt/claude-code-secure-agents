@@ -1,0 +1,79 @@
+name: Validate kit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Guardrails
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/validate.py --base "origin/${{ github.base_ref }}"
+          else
+            python3 scripts/validate.py
+          fi
+      - name: Install smoke test (fresh + idempotent re-run + opt-out)
+        shell: bash
+        run: |
+          export CLAUDE_HOME="$RUNNER_TEMP/claude-home"
+          bash install.sh --no-auto-update
+          for f in agents/planner.md agents/coder.md commands/build.md standards/ai-security.md hooks/prompt-reminder.txt; do
+            test -s "$CLAUDE_HOME/$f"
+            ! grep -q "__CLAUDE_HOME__" "$CLAUDE_HOME/$f"
+          done
+          grep -q "BEGIN claude-enterprise-agents" "$CLAUDE_HOME/CLAUDE.md"
+          python3 -c "import json,sys;s=json.load(open(sys.argv[1]));assert 'UserPromptSubmit' in s['hooks'];assert 'SessionStart' not in s['hooks']" "$CLAUDE_HOME/settings.json"
+          bash install.sh            # enable auto-update
+          bash install.sh            # idempotent
+          python3 -c "import json,sys;s=json.load(open(sys.argv[1]));h=s['hooks'];assert len(h['UserPromptSubmit'])==1 and len(h['SessionStart'])==1, h" "$CLAUDE_HOME/settings.json"
+          bash -n "$CLAUDE_HOME/hooks/self-update.sh"
+          test "$(cat "$CLAUDE_HOME/enterprise-agents/VERSION")" = "$(cat VERSION)"
+
+  windows-install:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install smoke test
+        shell: pwsh
+        run: |
+          $h = Join-Path $env:RUNNER_TEMP 'claude-home'
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ClaudeHome $h -NoAutoUpdate
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ClaudeHome $h
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -ClaudeHome $h
+          $s = Get-Content (Join-Path $h 'settings.json') -Raw | ConvertFrom-Json
+          if (@($s.hooks.UserPromptSubmit).Count -ne 1 -or @($s.hooks.SessionStart).Count -ne 1) { throw 'hook duplication' }
+          if (Select-String -Path (Join-Path $h 'agents\*.md') -Pattern '__CLAUDE_HOME__' -Quiet) { throw 'placeholder left' }
+          $raw = Get-Content (Join-Path $h 'settings.json') -Raw
+          if ($raw -notmatch '"SessionStart":\s*\[' -or $raw -match '"value":') { throw "malformed hook arrays in settings.json: $raw" }
+
+  # Releases a merged version that has no release yet (e.g. a PR that GitHub
+  # auto-merged after required checks, or a human merge). Idempotent.
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [validate, windows-install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Release if VERSION is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/release.sh "$(git rev-parse HEAD)"
