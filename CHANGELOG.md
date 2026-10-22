@@ -7,6 +7,7 @@
 - **Models and caps:** coder on Sonnet, cleaner on Haiku, planner and reviewer stay on Opus; `maxTurns` on every agent; output length caps.
 - **Learnings:** new Gate 7 saves short project learnings to `.claude/learnings/` for the next run.
 - **Optional add-ons:** graphify codebase map and Playwright CLI are used when installed; guidance for 21st.dev Magic MCP and Compound Engineering.
+- **One-command setup:** open Claude Code in the cloned repo and run `/setup` (or say "set up this repo"); it installs globally, verifies with `scripts/verify_install.py`, and reports.
 - **Pipeline cost:** Claude runs only on kit-relevant changelog entries, advisories and releases; docs-page changes are batched weekly; updates on Sonnet with lower turn caps, release gate on Opus.
 
 ## v1.1.0 — 2026-10-16

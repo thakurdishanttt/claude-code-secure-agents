@@ -108,6 +108,22 @@ It works with any stack. Agents detect the project's stack (Python, Node/TS, Jav
 
 ## Quick start
 
+**Easiest: let Claude Code install it.**
+
+```bash
+git clone https://github.com/thakurdishanttt/claude-code-secure-agents.git
+cd claude-code-secure-agents
+claude
+```
+
+Then type `/setup` (or just *"set up this repo"*). Claude picks the right
+installer for your OS, installs the kit globally, verifies it and tells you
+when to restart. After the restart it applies to **every project and every
+prompt**, and keeps itself updated. Add `--no-auto-update` to turn off
+self-updates. You can delete the cloned folder afterwards.
+
+**Or run the installer yourself:**
+
 ```bash
 git clone https://github.com/thakurdishanttt/claude-code-secure-agents.git
 cd claude-code-secure-agents
@@ -123,7 +139,8 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 bash install.sh
 ```
 
-Then **restart Claude Code** (or reload VS Code) and check the setup:
+Then **restart Claude Code** (or reload VS Code) and check the setup
+(`python3 scripts/verify_install.py` checks all of it at once):
 
 ```
 /agents   → planner, researcher, coder, reviewer, cleaner

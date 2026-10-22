@@ -44,7 +44,9 @@ claude-enterprise-agents/
 
 ## 3. Install
 
-Unzip anywhere, open a terminal **in the unzipped folder**, and run the command for your system.
+**Easiest:** open Claude Code in the cloned or unzipped folder (`claude`) and type `/setup`, or say *"set up this repo"*. Claude runs the right installer for your OS, verifies the result with `scripts/verify_install.py`, and tells you to restart. The repo ships `.claude/settings.json` pre-approving only the installer and verifier commands, so setup runs without permission prompts once you trust the folder.
+
+**Manually:** open a terminal **in the folder** and run the command for your system.
 
 **Windows (PowerShell):**
 ```powershell
