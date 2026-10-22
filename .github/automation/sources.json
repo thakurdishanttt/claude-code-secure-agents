@@ -1,5 +1,5 @@
 {
-  "_comment": "Upstream sources the auto-update loop watches. Kinds: changelog (markdown with '## <version>' headings), page (text page, diffed), gh_release (latest GitHub release tag), gh_advisories (GitHub Advisory Database entries for a package). Add a source here and the next scheduled run picks it up. Only https URLs on hosts listed in allowed_hosts are fetched.",
+  "_comment": "Upstream sources the auto-update loop watches. Kinds: changelog (markdown with '## <version>' headings), page (text page, diffed), gh_release (latest GitHub release tag), gh_advisories (GitHub Advisory Database entries for a package). Add a source here and the next scheduled run picks it up. Only https URLs on hosts listed in allowed_hosts are fetched. Sources with \"batch\": true (docs pages) trigger the Claude run at most weekly unless an urgent source changed; changelog entries are filtered to kit-relevant lines (override with \"relevant\": regex).",
   "allowed_hosts": [
     "raw.githubusercontent.com",
     "api.github.com",
@@ -34,61 +34,71 @@
       "id": "docs-subagents",
       "kind": "page",
       "category": "claude-code-features",
-      "url": "https://code.claude.com/docs/en/sub-agents.md"
+      "url": "https://code.claude.com/docs/en/sub-agents.md",
+      "batch": true
     },
     {
       "id": "docs-hooks",
       "kind": "page",
       "category": "claude-code-features",
-      "url": "https://code.claude.com/docs/en/hooks.md"
+      "url": "https://code.claude.com/docs/en/hooks.md",
+      "batch": true
     },
     {
       "id": "docs-settings",
       "kind": "page",
       "category": "claude-code-features",
-      "url": "https://code.claude.com/docs/en/settings.md"
+      "url": "https://code.claude.com/docs/en/settings.md",
+      "batch": true
     },
     {
       "id": "docs-slash-commands",
       "kind": "page",
       "category": "claude-code-features",
-      "url": "https://code.claude.com/docs/en/slash-commands.md"
+      "url": "https://code.claude.com/docs/en/slash-commands.md",
+      "batch": true
     },
     {
       "id": "docs-skills",
       "kind": "page",
       "category": "claude-code-features",
-      "url": "https://code.claude.com/docs/en/skills.md"
+      "url": "https://code.claude.com/docs/en/skills.md",
+      "batch": true
     },
     {
       "id": "docs-memory",
       "kind": "page",
       "category": "claude-code-features",
-      "url": "https://code.claude.com/docs/en/memory.md"
+      "url": "https://code.claude.com/docs/en/memory.md",
+      "batch": true
     },
     {
       "id": "docs-security",
       "kind": "page",
       "category": "ai-security",
-      "url": "https://code.claude.com/docs/en/security.md"
+      "url": "https://code.claude.com/docs/en/security.md",
+      "batch": true
     },
     {
       "id": "docs-iam-permissions",
       "kind": "page",
       "category": "ai-security",
-      "url": "https://code.claude.com/docs/en/iam.md"
+      "url": "https://code.claude.com/docs/en/iam.md",
+      "batch": true
     },
     {
       "id": "owasp-llm-top10",
       "kind": "page",
       "category": "ai-security",
-      "url": "https://genai.owasp.org/llm-top-10/"
+      "url": "https://genai.owasp.org/llm-top-10/",
+      "batch": true
     },
     {
       "id": "owasp-agentic-top10",
       "kind": "page",
       "category": "ai-security",
-      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "batch": true
     },
     {
       "id": "mitre-atlas-data",
@@ -100,7 +110,8 @@
       "id": "nist-ai-rmf",
       "kind": "page",
       "category": "ai-security",
-      "url": "https://www.nist.gov/itl/ai-risk-management-framework"
+      "url": "https://www.nist.gov/itl/ai-risk-management-framework",
+      "batch": true
     }
   ]
 }

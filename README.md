@@ -47,6 +47,25 @@ Gate 5  Clean ── cleaner × N (parallel) → security re-check
 Gate 6  Verify ── full test run, real output shown
 ```
 
+## Token efficiency
+
+The kit is built to spend tokens only where they buy accuracy:
+
+| Lever | What it does |
+|---|---|
+| `/build` tiers S / M / L | Small changes: you + 1 reviewer. Default: planner → coder → 1 reviewer. Only large or boundary-crossing work gets parallel research, split security ‖ correctness reviews and cleaners. |
+| Standard index | Agents read `standards/ai-security-index.md` (~600 tokens) and pull only the sections a change touches, instead of the full ~2,700-token standard each time. |
+| Context packs | The lead hands every subagent its exact files, standard sections, research and callers, so agents don't rediscover the codebase. |
+| Right-sized models + caps | Opus for planning and the security gate, Sonnet for coding and research, Haiku for mechanical cleanup; `maxTurns` on every agent. |
+| Learnings (compound step) | `/build` ends by saving 3–8 lines of anything a future run would rediscover to `.claude/learnings/`; the next run reads those first. |
+| Codebase map (optional) | If [graphify](https://github.com/Graphify-Labs/graphify) has built `graphify-out/` for a project, agents query the graph instead of grepping. |
+| Browser checks (optional) | Coders verify UI with the Playwright CLI, which writes snapshots to files instead of streaming them into context. |
+
+The auto-update pipeline runs a free check daily but only calls Claude when a
+kit-relevant change lands: unrelated changelog entries are filtered out and
+docs-page changes are batched weekly. Updates run on Sonnet; the release gate
+stays on Opus.
+
 ## Automatic updates (zero-touch)
 
 ```

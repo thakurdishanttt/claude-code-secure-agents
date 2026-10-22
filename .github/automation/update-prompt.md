@@ -37,6 +37,9 @@ with current Claude Code features and current AI-security guidance.
    atlas.mitre.org, github.com/anthropics). Do not rely on memory for product
    details. Never put repository content into search queries.
 3. Make the smallest correct edits. Keep the existing tone and structure.
+   If you add or rename a section of `standards/ai-security.md`, update
+   `standards/ai-security-index.md` to match. Keep agent prompts and the
+   index short: every line is paid for on every agent run.
 4. Run the validator command given at the end of this prompt and fix every
    error it reports. Do not finish with a failing validation.
 5. Write `RUN_SUMMARY.md` in the repository root:

@@ -21,7 +21,8 @@
 #   secret   ANTHROPIC_API_KEY  or  CLAUDE_CODE_OAUTH_TOKEN      (required)
 #   secret   AUTOMATION_TOKEN   (optional: GitHub App / fine-grained PAT; needed if
 #                                branch protection blocks merges by GITHUB_TOKEN)
-#   variable CLAUDE_MODEL         (optional, default "opus")
+#   variable CLAUDE_MODEL         (optional, update/fix runs, default "sonnet")
+#   variable CLAUDE_REVIEW_MODEL  (optional, release-gate reviewer, default "opus")
 #   variable AUTO_MERGE           (optional, "false" = open PRs, never merge)
 #   variable AUTO_UPDATE_ENABLED  (optional, "false" = kill switch)
 # and Settings → Actions → General → Workflow permissions: "Read and write" +
@@ -30,7 +31,7 @@ name: Auto-update kit
 
 on:
   schedule:
-    - cron: "17 1 * * *"     # daily 01:17 UTC (06:47 IST)
+    - cron: "17 1 * * *"     # daily 01:17 UTC (06:47 IST): a free check; Claude runs only on kit-relevant changes
   workflow_dispatch:
     inputs:
       force:
@@ -65,7 +66,8 @@ jobs:
       has_changes: ${{ steps.result.outputs.has_changes }}
       failing_sources: ${{ steps.check.outputs.failing_sources }}
     env:
-      MODEL: ${{ vars.CLAUDE_MODEL || 'opus' }}
+      MODEL: ${{ vars.CLAUDE_MODEL || 'sonnet' }}
+      REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL || 'opus' }}
       TRUSTED: ${{ github.workspace }}/../trusted
       STATE_IN: ${{ github.workspace }}/../state-in
       STATE_OUT: ${{ github.workspace }}/../state-out
@@ -151,7 +153,7 @@ jobs:
           github_token: ${{ github.token }}
           prompt: ${{ env.update }}
           claude_args: >-
-            --model ${{ env.MODEL }} --max-turns 120
+            --model ${{ env.MODEL }} --max-turns 50
             --allowedTools "Read,Glob,Grep,${{ env.WRITE_TOOLS }},${{ env.ALLOWED_FETCH }},Bash(python3 ${{ env.TRUSTED }}/scripts/validate.py:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)"
             --disallowedTools "${{ env.DENY_TOOLS }}"
 
@@ -189,7 +191,7 @@ jobs:
           github_token: ${{ github.token }}
           prompt: ${{ env.review }}
           claude_args: >-
-            --model ${{ env.MODEL }} --max-turns 60
+            --model ${{ env.REVIEW_MODEL }} --max-turns 30
             --allowedTools "Read,Glob,Grep,${{ env.ALLOWED_FETCH }},Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)"
             --disallowedTools "Edit,Write,NotebookEdit,${{ env.DENY_TOOLS }}"
             --json-schema '${{ env.REVIEW_SCHEMA }}'
@@ -225,7 +227,7 @@ jobs:
             `git checkout origin/main -- <file>`. Re-run the validator until it passes and
             update `RUN_SUMMARY.md` and `CHANGELOG.md` to match.
           claude_args: >-
-            --model ${{ env.MODEL }} --max-turns 80
+            --model ${{ env.MODEL }} --max-turns 30
             --allowedTools "Read,Glob,Grep,${{ env.WRITE_TOOLS }},${{ env.ALLOWED_FETCH }},Bash(python3 ${{ env.TRUSTED }}/scripts/validate.py:*),Bash(git diff:*),Bash(git status:*),Bash(git show:*),Bash(git checkout origin/main --:*)"
             --disallowedTools "${{ env.DENY_TOOLS }}"
 
@@ -275,7 +277,8 @@ jobs:
     outputs:
       verdict: ${{ steps.gate.outputs.verdict }}
     env:
-      MODEL: ${{ vars.CLAUDE_MODEL || 'opus' }}
+      MODEL: ${{ vars.CLAUDE_MODEL || 'sonnet' }}
+      REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL || 'opus' }}
       G: ${{ github.workspace }}/../guardrails
       GIT_CONFIG_COUNT: "2"
       GIT_CONFIG_KEY_0: core.fsmonitor
@@ -320,7 +323,7 @@ jobs:
           github_token: ${{ github.token }}
           prompt: ${{ env.review }}
           claude_args: >-
-            --model ${{ env.MODEL }} --max-turns 60
+            --model ${{ env.REVIEW_MODEL }} --max-turns 30
             --allowedTools "Read,Glob,Grep,${{ env.ALLOWED_FETCH }},Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)"
             --disallowedTools "Edit,Write,NotebookEdit,${{ env.DENY_TOOLS }}"
             --json-schema '${{ env.REVIEW_SCHEMA }}'

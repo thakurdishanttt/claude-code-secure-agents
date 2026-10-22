@@ -158,7 +158,18 @@ Use the researcher agent: is library X affected by any CVEs?
 - **Built-in safety rules.** The agents never commit, push, deploy or delete data unless you explicitly ask.
 - **Token usage.** Parallel agents finish faster but use more tokens than a single session. Each run is capped at about 10 agents unless you ask for more.
 
-## 10. Automatic updates
+## 10. Optional add-ons (token savers)
+
+None of these are installed by the kit; enable them per machine or project after your security review.
+
+| Add-on | Use it for | Install | Enterprise notes |
+|---|---|---|---|
+| [graphify](https://github.com/Graphify-Labs/graphify) | Codebase knowledge graph; agents query it instead of grepping. Gains grow with repo size (tiny repos: ~none). | `pipx install graphifyy && graphify install`, then `/graphify .` in the project | Code is parsed locally (tree-sitter). Docs, PDFs and images are sent to a model for extraction — exclude them for confidential repos. Add `graphify-out/` to `.gitignore` unless you want it shared. The PyPI name is `graphifyy`; verify it against the GitHub repo. |
+| [Playwright CLI](https://playwright.dev) | Browser verification of UI changes, ~4× fewer tokens than the Playwright MCP server because snapshots go to files. | Follow the Playwright docs for `@playwright/cli` and its Claude Code skill | Prefer it over the Playwright MCP server in this kit. |
+| [21st.dev Magic MCP](https://21st.dev) | Generating React/Tailwind UI components. | Per project, not globally | Sends your prompts to a third-party service and needs an API key; only for frontend projects your data policy allows. |
+| [Compound Engineering plugin](https://github.com/EveryInc/compound-engineering-plugin) | Its idea — saving learnings after each task — is built into `/build` (Gate 7). | Not recommended alongside this kit | Its `/lfg` commits and opens PRs on its own, which conflicts with this kit's never-commit rule, and its review spawns its own agents on top of ours. |
+
+## 11. Automatic updates
 
 ### How it works
 1. **Upstream watch** (`.github/workflows/auto-update.yml`, daily 01:17 UTC, also runnable by hand). `scripts/check_upstream.py` checks the sources in `.github/automation/sources.json`: the Claude Code changelog and docs (subagents, hooks, settings, slash commands, skills, memory, security, permissions), GitHub advisories for Claude Code, claude-code-action releases, OWASP LLM and Agentic Top 10, MITRE ATLAS and NIST AI RMF. Cosmetic page churn is filtered out. The first run is a full baseline audit.

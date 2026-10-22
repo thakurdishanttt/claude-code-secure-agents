@@ -43,6 +43,15 @@ MAX_REPORT_CHARS = 120_000      # whole report
 RETRIES = 3
 NOISE_MIN_CHANGED_LINES = 3     # page diffs smaller than this are ignored
 BASELINE_CHANGELOG_VERSIONS = 12
+BATCH_DAYS = 7                  # batched sources trigger the (paid) Claude run at most weekly
+# Changelog lines that can affect this kit. Everything else (UI, perf, bug fixes
+# in unrelated areas) is recorded but does not trigger a Claude run.
+DEFAULT_RELEVANT = (
+    r"\b(sub-?agents?|agents?/|hooks?|SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|Stop\b|"
+    r"settings|permission|allowedTools|disallowedTools|sandbox|security|vulnerab|CVE|GHSA|"
+    r"slash command|commands?/|skills?|plugin|MCP|CLAUDE\.md|memory|model|frontmatter|"
+    r"maxTurns|effort|deprecat|remov|breaking|managed|enterprise|policy)"
+)
 USER_AGENT = "claude-code-secure-agents-upstream-watch/1.0"
 
 VERSION_HEADING = re.compile(r"^##\s+\[?v?(\d+(?:\.\d+)+)\]?", re.M)
@@ -123,7 +132,22 @@ def check_changelog(src: dict, prev: dict, hosts: set[str]) -> tuple[dict, str |
         stop = min(len(matches), BASELINE_CHANGELOG_VERSIONS)
     end = matches[stop].start() if stop < len(matches) else len(text)
     body = text[matches[0].start():end]
-    detail = f"New versions since `{seen or 'baseline'}`: " + ", ".join(versions[:stop]) + "\n\n" + body
+    relevant = re.compile(src.get("relevant", DEFAULT_RELEVANT), re.I)
+    kept, current = [], None
+    for line in body.splitlines():
+        if VERSION_HEADING.match(line):
+            current = line
+        elif line.strip() and relevant.search(line):
+            if current:
+                kept.append(current)
+                current = None
+            kept.append(line)
+    new = ", ".join(versions[:stop])
+    if not kept:
+        print(f"[info] {src['id']}: {new} — no kit-relevant entries", file=sys.stderr)
+        return new_state, None
+    detail = (f"New versions since `{seen or 'baseline'}`: {new}\n"
+              f"(only entries that can affect the kit are shown)\n\n" + "\n".join(kept))
     return new_state, detail
 
 
@@ -197,7 +221,10 @@ def main() -> int:
     new_sources: dict[str, dict] = {}
     failures: dict[str, int] = dict(prev_all.get("failures", {}))
     sections: list[str] = []
+    batched: list[tuple[dict, str]] = []
     errors: list[str] = []
+    last_run = float(prev_all.get("last_claude_run", 0))
+    batch_due = (time.time() - last_run) >= BATCH_DAYS * 86400
 
     for src in cfg["sources"]:
         sid, kind = src["id"], src["kind"]
@@ -223,6 +250,9 @@ def main() -> int:
             errors.append(f"- `{sid}`: {exc} (consecutive failures: {failures[sid]})")
             print(f"[warn] {sid}: {exc}", file=sys.stderr)
             continue
+        if detail and src.get("batch") and not baseline:
+            batched.append((src, detail))
+            continue
         if detail:
             if len(detail) > MAX_DIFF_CHARS:
                 detail = detail[:MAX_DIFF_CHARS] + "\n…(truncated; fetch the source for the rest)"
@@ -231,6 +261,29 @@ def main() -> int:
                 f"### {sid}  ·  category: {src['category']}  ·  source: {where}\n"
                 f"<untrusted-upstream-content source=\"{sid}\">\n{detail}\n</untrusted-upstream-content>\n"
             )
+
+    # Batched sources (docs pages) only trigger once a week; until then their
+    # previous state is kept so the diff keeps accumulating against what Claude
+    # last processed. Urgent sources (changelog, advisories, releases) pull them in.
+    include_batched = bool(batched) and (bool(sections) or batch_due or args.force)
+    for src, detail in batched:
+        sid = src["id"]
+        if include_batched:
+            if len(detail) > MAX_DIFF_CHARS:
+                detail = detail[:MAX_DIFF_CHARS] + "\n…(truncated; fetch the source for the rest)"
+            sections.append(
+                f"### {sid}  ·  category: {src['category']}  ·  source: {src.get('url')}\n"
+                f"<untrusted-upstream-content source=\"{sid}\">\n{detail}\n</untrusted-upstream-content>\n"
+            )
+        else:
+            new_sources[sid] = prev_sources.get(sid, {})
+            old = snap_in / f"{sid}.txt"
+            if old.exists():
+                (snap_out / f"{sid}.txt").write_text(old.read_text(encoding="utf-8"), encoding="utf-8")
+            else:
+                (snap_out / f"{sid}.txt").unlink(missing_ok=True)
+    if batched and not include_batched:
+        print(f"[info] {len(batched)} batched source(s) changed; deferred until the weekly run", file=sys.stderr)
 
     changed = bool(sections) or args.force
     head = [
@@ -251,7 +304,8 @@ def main() -> int:
     Path(args.report).write_text(report, encoding="utf-8")
 
     out = {"version": 1, "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-           "sources": new_sources, "failures": failures}
+           "sources": new_sources, "failures": failures,
+           "last_claude_run": time.time() if changed else last_run}
     (state_out / "state.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
 
     persistent = [s for s, n in failures.items() if n >= 5]
