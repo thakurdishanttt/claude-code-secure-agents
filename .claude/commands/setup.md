@@ -9,17 +9,13 @@ questions unless a step fails. Keep output short.
 Options from the user: $ARGUMENTS
 (`--no-auto-update` disables the background self-update; default is on.)
 
-## 1. Pre-checks (one Bash call)
-Run from the repository root:
-```
-git rev-parse --show-toplevel && cat VERSION && uname -s 2>/dev/null; echo "OS=$OS"; command -v python3 node git powershell pwsh 2>/dev/null
-```
-- Stop and tell the user if this is not the kit's repository (no `install.sh`,
-  `install.ps1` and `VERSION` at the root).
-- Platform: `OS=Windows_NT`, or `uname` printing MINGW/MSYS/CYGWIN → Windows.
-  Linux, macOS (Darwin) and WSL → Unix.
-- Unix needs `python3` or `node` (to merge settings safely). If both are
-  missing, stop and say which one to install.
+## 1. Pre-checks (no shell commands needed)
+- Use Glob to confirm `install.sh`, `install.ps1` and `VERSION` exist at the
+  repository root; otherwise stop and say this is not the kit's repository.
+- Platform: take it from your environment info. Windows (win32, or a
+  MINGW/MSYS/Cygwin shell) → Windows installer. Linux, macOS and WSL → Unix
+  installer. The installers check their own prerequisites and say what is
+  missing.
 
 ## 2. Install
 - Unix: `bash install.sh $ARGUMENTS`
