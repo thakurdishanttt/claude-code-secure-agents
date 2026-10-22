@@ -122,6 +122,13 @@ when to restart. After the restart it applies to **every project and every
 prompt**, and keeps itself updated. Add `--no-auto-update` to turn off
 self-updates. You can delete the cloned folder afterwards.
 
+**Already have an older version?** Run `/setup` again in your clone. It
+pulls the clone up to date first, then upgrades the installed kit in place
+(from any version, including v1.0), keeping your own `CLAUDE.md` and
+`settings.json`. It never downgrades: if the machine already has a newer
+version, it reports "already up to date". Clones made before `/setup`
+existed need one `git pull` first.
+
 **Or run the installer yourself:**
 
 ```bash

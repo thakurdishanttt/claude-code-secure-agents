@@ -15,6 +15,7 @@ DEFAULT_REPO="https://github.com/thakurdishanttt/claude-code-secure-agents.git"
 REMINDER_MARKER="prompt-reminder.txt"
 UPDATE_MARKER="self-update"
 AUTO_UPDATE=1
+ALLOW_DOWNGRADE=0
 QUIET=0
 SELF_UPDATE=0
 KEEP_BACKUPS=5
@@ -24,6 +25,7 @@ for arg in "$@"; do
     --no-auto-update) AUTO_UPDATE=0 ;;
     --quiet) QUIET=1 ;;
     --self-update) SELF_UPDATE=1 ;;
+    --allow-downgrade) ALLOW_DOWNGRADE=1 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -49,7 +51,21 @@ render() { sed "s|__CLAUDE_HOME__|$SED_HOME|g" "$1"; }
 # Replace via a temp file + rename so a running script (the self-updater) keeps its old inode.
 place() { cp "$1" "$2.new-$$" && mv -f "$2.new-$$" "$2"; }
 
-say "Installing into $CLAUDE_HOME"
+# Never replace a newer installed kit with an older checkout (e.g. a stale clone).
+NEW_VERSION="$(tr -d '[:space:]' < "$SRC/VERSION")"
+OLD_VERSION=""
+if [ -f "$STATE/VERSION" ]; then OLD_VERSION="$(tr -d '[:space:]' < "$STATE/VERSION")"; fi
+if [ -n "$OLD_VERSION" ] && [ "$ALLOW_DOWNGRADE" = 0 ] && [ "$OLD_VERSION" != "$NEW_VERSION" ] \
+   && [ "$(printf '%s\n%s\n' "$OLD_VERSION" "$NEW_VERSION" | sort -V | tail -n 1)" = "$OLD_VERSION" ]; then
+  echo "Already on a newer version ($OLD_VERSION) than this checkout ($NEW_VERSION); nothing changed."
+  echo "Update this checkout (git pull) or pass --allow-downgrade to install it anyway."
+  exit 0
+fi
+if [ -z "$OLD_VERSION" ] && [ -f "$CLAUDE_HOME/agents/planner.md" ]; then OLD_VERSION="1.0.x (pre-auto-update)"; fi
+
+if [ -z "$OLD_VERSION" ]; then say "Installing $NEW_VERSION into $CLAUDE_HOME"
+elif [ "$OLD_VERSION" = "$NEW_VERSION" ]; then say "Reinstalling $NEW_VERSION into $CLAUDE_HOME (already up to date; repairing)"
+else say "Upgrading $OLD_VERSION -> $NEW_VERSION in $CLAUDE_HOME"; fi
 mkdir -p "$CLAUDE_HOME"/{agents,commands,standards,hooks} "$STATE"
 
 # 0. Stage everything first so a failure never leaves a half-installed kit.

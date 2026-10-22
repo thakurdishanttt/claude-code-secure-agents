@@ -85,8 +85,17 @@ def main() -> int:
 
     version = (state / "VERSION").read_text(encoding="utf-8").strip() if (state / "VERSION").exists() else "?"
     expect = a.expect_version or ((ROOT / "VERSION").read_text(encoding="utf-8").strip() if (ROOT / "VERSION").exists() else None)
-    if expect and version != expect:
-        problems.append(f"installed version {version}, expected {expect}")
+    def vt(v: str) -> tuple:
+        try:
+            return tuple(int(x) for x in v.split("."))
+        except ValueError:
+            return (0,)
+    if expect and version == "?":
+        problems.append("installed version unknown")
+    elif expect and vt(version) < vt(expect):
+        problems.append(f"installed version {version} is older than this checkout ({expect})")
+    elif expect and vt(version) > vt(expect):
+        ok.append(f"version {version} (newer than this checkout, {expect}; kept)")
     else:
         ok.append(f"version {version}")
 

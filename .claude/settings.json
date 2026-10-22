@@ -8,7 +8,10 @@
       "Bash(python3 scripts/verify_install.py)",
       "Bash(python scripts/verify_install.py)",
       "Bash(py scripts/verify_install.py)",
-      "Bash(python3 scripts/validate.py:*)"
+      "Bash(python3 scripts/validate.py:*)",
+      "Bash(git fetch --quiet origin)",
+      "Bash(git status -sb)",
+      "Bash(git pull --ff-only)"
     ]
   }
 }

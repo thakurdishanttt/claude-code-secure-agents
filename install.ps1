@@ -6,7 +6,8 @@ param(
     [string]$ClaudeHome = (Join-Path $env:USERPROFILE '.claude'),
     [switch]$NoAutoUpdate,
     [switch]$Quiet,
-    [switch]$SelfUpdate
+    [switch]$SelfUpdate,
+    [switch]$AllowDowngrade
 )
 $ErrorActionPreference = 'Stop'
 
@@ -48,7 +49,23 @@ function Set-IfChanged([string]$path, [string]$text, [string]$label) {
     Say "  installed: $label"
 }
 
-Say "Installing into $ClaudeHome"
+# Never replace a newer installed kit with an older checkout (e.g. a stale clone).
+$newVersion = ("" + [System.IO.File]::ReadAllText((Join-Path $src 'VERSION'))).Trim()
+$oldVersion = ''
+if (Test-Path (Join-Path $state 'VERSION')) { $oldVersion = ("" + [System.IO.File]::ReadAllText((Join-Path $state 'VERSION'))).Trim() }
+if ($oldVersion -and -not $AllowDowngrade) {
+    try {
+        if ([version]$oldVersion -gt [version]$newVersion) {
+            Write-Host "Already on a newer version ($oldVersion) than this checkout ($newVersion); nothing changed."
+            Write-Host "Update this checkout (git pull) or pass -AllowDowngrade to install it anyway."
+            exit 0
+        }
+    } catch { }
+}
+if (-not $oldVersion -and (Test-Path (Join-Path $ClaudeHome 'agents/planner.md'))) { $oldVersion = '1.0.x (pre-auto-update)' }
+if (-not $oldVersion) { Say "Installing $newVersion into $ClaudeHome" }
+elseif ($oldVersion -eq $newVersion) { Say "Reinstalling $newVersion into $ClaudeHome (already up to date; repairing)" }
+else { Say "Upgrading $oldVersion -> $newVersion in $ClaudeHome" }
 foreach ($d in 'agents', 'commands', 'standards', 'hooks', 'enterprise-agents') {
     New-Item -ItemType Directory -Force (Join-Path $ClaudeHome $d) | Out-Null
 }

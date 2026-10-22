@@ -8,6 +8,7 @@
 - **Learnings:** new Gate 7 saves short project learnings to `.claude/learnings/` for the next run.
 - **Optional add-ons:** graphify codebase map and Playwright CLI are used when installed; guidance for 21st.dev Magic MCP and Compound Engineering.
 - **One-command setup:** open Claude Code in the cloned repo and run `/setup` (or say "set up this repo"); it installs globally, verifies with `scripts/verify_install.py`, and reports.
+- **Upgrade on setup:** `/setup` fast-forwards a stale clone, then upgrades any older installed version (including v1.0) in place; installers refuse to downgrade a newer install (`--allow-downgrade` / `-AllowDowngrade` to override).
 - **Pipeline cost:** Claude runs only on kit-relevant changelog entries, advisories and releases; docs-page changes are batched weekly; updates on Sonnet with lower turn caps, release gate on Opus.
 
 ## v1.1.0 — 2026-10-16
