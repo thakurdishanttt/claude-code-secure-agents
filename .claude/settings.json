@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash install.sh)",
+      "Bash(bash install.sh --no-auto-update)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ./install.ps1 -NoAutoUpdate)",
+      "Bash(python3 scripts/verify_install.py)",
+      "Bash(python scripts/verify_install.py)",
+      "Bash(py scripts/verify_install.py)",
+      "Bash(python3 scripts/validate.py:*)",
+      "Bash(git fetch --quiet origin)",
+      "Bash(git status -sb)",
+      "Bash(git pull --ff-only)"
+    ]
+  }
+}

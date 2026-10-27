@@ -1,0 +1,527 @@
+# Fully automatic maintenance loop for the agent kit.
+#
+#   detect upstream changes ─► Claude updates kit content ─► pinned validator
+#   (no-weakening) ─► independent read-only Claude reviewer ─► one automatic
+#   fix cycle ─► fresh-checkout re-validation ─► version bump + PR
+#   ─► auto-merge ─► GitHub release ─► installed machines self-update
+#
+# Trust boundary:
+#   job `propose` — Claude runs here with a READ-ONLY token and no git credentials.
+#     Guardrails (validator, prompts, watcher state) are pinned from main into a
+#     read-only directory outside the workspace and hash-checked after every bot
+#     step. Output: a patch of kit content files only.
+#   job `review` — fresh checkout of main, patch filtered to kit paths and applied,
+#     pinned validator, then an independent Claude reviewer with NO write tools.
+#     Its verdict is the release gate.
+#   job `ship` — fresh checkout of main applies the same filtered patch, re-runs
+#     main's validator from a pinned copy, and only then commits, merges, releases.
+#   Installers and hook scripts are human-only; the bot may change kit content.
+#
+# One-time setup (repo Settings → Secrets and variables → Actions):
+#   secret   ANTHROPIC_API_KEY  or  CLAUDE_CODE_OAUTH_TOKEN      (required)
+#   secret   AUTOMATION_TOKEN   (optional: GitHub App / fine-grained PAT; needed if
+#                                branch protection blocks merges by GITHUB_TOKEN)
+#   variable CLAUDE_MODEL         (optional, update/fix runs, default "sonnet")
+#   variable CLAUDE_REVIEW_MODEL  (optional, release-gate reviewer, default "opus")
+#   variable AUTO_MERGE           (optional, "false" = open PRs, never merge)
+#   variable AUTO_UPDATE_ENABLED  (optional, "false" = kill switch)
+# and Settings → Actions → General → Workflow permissions: "Read and write" +
+# "Allow GitHub Actions to create and approve pull requests".
+name: Auto-update kit
+
+on:
+  schedule:
+    - cron: "17 1 * * *"     # daily 01:17 UTC (06:47 IST): a free check; Claude runs only on kit-relevant changes
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run the Claude update even if no upstream change was detected"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-update
+  cancel-in-progress: false
+
+env:
+  KIT_PATHS: "agents commands standards hooks/prompt-reminder.txt CLAUDE.global.md README.md INTEGRATION.md CHANGELOG.md"
+  ALLOWED_FETCH: "WebFetch(domain:code.claude.com),WebFetch(domain:docs.claude.com),WebFetch(domain:docs.anthropic.com),WebFetch(domain:www.anthropic.com),WebFetch(domain:github.com),WebFetch(domain:raw.githubusercontent.com),WebFetch(domain:genai.owasp.org),WebFetch(domain:owasp.org),WebFetch(domain:www.nist.gov),WebFetch(domain:nvlpubs.nist.gov),WebFetch(domain:atlas.mitre.org)"
+  WRITE_TOOLS: "Edit(agents/**),Write(agents/**),Edit(commands/**),Write(commands/**),Edit(standards/**),Write(standards/**),Edit(hooks/prompt-reminder.txt),Edit(CLAUDE.global.md),Edit(README.md),Edit(INTEGRATION.md),Edit(CHANGELOG.md),Write(RUN_SUMMARY.md)"
+  DENY_TOOLS: "Edit(.git/**),Write(.git/**),Edit(//**/.git/**),Write(//**/.git/**),Read(//proc/**),Bash(git commit:*),Bash(git push:*),Bash(git reset:*),Bash(git config:*),Bash(git remote:*),Bash(rm:*),Bash(curl:*),Bash(wget:*),Bash(env:*),Bash(printenv:*),Bash(cat:*)"
+  REVIEW_SCHEMA: '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["APPROVE","REQUEST_CHANGES","BLOCK"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"string"}}}}'
+
+jobs:
+  # ====================================================================== propose
+  propose:
+    if: vars.AUTO_UPDATE_ENABLED != 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read                        # the job Claude runs in can write nothing
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      has_changes: ${{ steps.result.outputs.has_changes }}
+      failing_sources: ${{ steps.check.outputs.failing_sources }}
+    env:
+      MODEL: ${{ vars.CLAUDE_MODEL || 'sonnet' }}
+      REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL || 'opus' }}
+      TRUSTED: ${{ github.workspace }}/../trusted
+      STATE_IN: ${{ github.workspace }}/../state-in
+      STATE_OUT: ${{ github.workspace }}/../state-out
+      # Environment-level git config wins over .git/config, so a planted
+      # core.fsmonitor / hooksPath can never execute in later git calls.
+      GIT_CONFIG_COUNT: "3"
+      GIT_CONFIG_KEY_0: core.fsmonitor
+      GIT_CONFIG_VALUE_0: "false"
+      GIT_CONFIG_KEY_1: core.hooksPath
+      GIT_CONFIG_VALUE_1: /dev/null
+      GIT_CONFIG_KEY_2: core.pager
+      GIT_CONFIG_VALUE_2: cat
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false        # the bot must never see a git credential
+
+      - name: Preflight
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' || secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error::Set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in repository secrets."
+            exit 1
+          fi
+          git config core.hooksPath /dev/null
+          python3 scripts/validate.py     # main must be healthy before the bot touches it
+
+      - name: Pin guardrails outside the workspace (read-only)
+        id: pin
+        run: |
+          mkdir -p "$TRUSTED"
+          git archive origin/main scripts .github/automation | tar -x -C "$TRUSTED"
+          chmod -R a-w "$TRUSTED"
+          ( cd "$TRUSTED" && find . -type f -print0 | sort -z | xargs -0 sha256sum ) > "$RUNNER_TEMP/trusted.sha256"
+          { git config --local --list; ls -la .git/hooks; } | sha256sum > "$RUNNER_TEMP/gitmeta.sha256"
+          echo "trusted=$(sha256sum < "$RUNNER_TEMP/trusted.sha256" | cut -c1-64)" >> "$GITHUB_OUTPUT"
+          echo "gitmeta=$(cut -c1-64 "$RUNNER_TEMP/gitmeta.sha256")" >> "$GITHUB_OUTPUT"
+          echo "gitconfig=$(sha256sum < .git/config | cut -c1-64)" >> "$GITHUB_OUTPUT"
+          {
+            echo "update<<__PROMPT_EOF__"
+            cat "$TRUSTED/.github/automation/update-prompt.md"
+            echo
+            echo "Validator command (the only command you may run besides read-only git): python3 $TRUSTED/scripts/validate.py --root . --base origin/main --bot"
+            echo "__PROMPT_EOF__"
+            echo "review<<__PROMPT_EOF__"
+            cat "$TRUSTED/.github/automation/review-prompt.md"
+            echo "__PROMPT_EOF__"
+          } >> "$GITHUB_ENV"
+
+      - name: Load watcher state
+        env:
+          READ_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$STATE_IN" "$STATE_OUT"
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$READ_TOKEN" | base64 -w0)"
+          if git -c http.https://github.com/.extraheader="$auth" fetch --quiet origin automation-state 2>/dev/null; then
+            git archive FETCH_HEAD | tar -x -C "$STATE_IN"
+          fi
+
+      - name: Detect upstream changes
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
+        run: |
+          python3 "$TRUSTED/scripts/check_upstream.py" \
+            --sources "$TRUSTED/.github/automation/sources.json" \
+            --state-dir "$STATE_IN" --out-state-dir "$STATE_OUT" \
+            --report UPSTREAM_REPORT.md $FORCE
+          ( cd "$STATE_OUT" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum ) > "$RUNNER_TEMP/state.sha256"
+          chmod -R a-w "$STATE_OUT"
+          cat UPSTREAM_REPORT.md >> "$GITHUB_STEP_SUMMARY"
+
+      # ------------------------------------------------------------ update
+      - name: Claude updates the kit
+        if: steps.check.outputs.changed == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: ${{ env.update }}
+          claude_args: >-
+            --model ${{ env.MODEL }} --max-turns 50
+            --allowedTools "Read,Glob,Grep,${{ env.WRITE_TOOLS }},${{ env.ALLOWED_FETCH }},Bash(python3 ${{ env.TRUSTED }}/scripts/validate.py:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)"
+            --disallowedTools "${{ env.DENY_TOOLS }}"
+
+      - name: Tamper check + validate
+        if: steps.check.outputs.changed == 'true'
+        id: validate1
+        continue-on-error: true
+        shell: bash
+        env:
+          EXPECT_TRUSTED: ${{ steps.pin.outputs.trusted }}
+          EXPECT_GITMETA: ${{ steps.pin.outputs.gitmeta }}
+          EXPECT_GITCONFIG: ${{ steps.pin.outputs.gitconfig }}
+        run: bash "$TRUSTED/scripts/post_bot_check.sh" 2>&1 | tee validate.txt
+
+      - name: Inspect result
+        if: steps.check.outputs.changed == 'true'
+        id: result
+        shell: bash
+        run: |
+          first="$(head -n 1 RUN_SUMMARY.md 2>/dev/null | tr -d '\r ')"
+          # shellcheck disable=SC2086
+          kit_changes="$(git status --porcelain --untracked-files=all -- $KIT_PATHS | wc -l)"
+          # The bot's NO_CHANGES claim is ignored if it actually edited kit files.
+          if [ "$kit_changes" = "0" ]; then echo "has_changes=false"; else echo "has_changes=true"; fi >> "$GITHUB_OUTPUT"
+          echo "Bot summary first line: ${first:-<none>}; kit files changed: $kit_changes"
+
+      # ------------------------------------------------------------ review
+      - name: Independent security review (read-only)
+        if: steps.result.outputs.has_changes == 'true'
+        id: review1
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: ${{ env.review }}
+          claude_args: >-
+            --model ${{ env.REVIEW_MODEL }} --max-turns 30
+            --allowedTools "Read,Glob,Grep,${{ env.ALLOWED_FETCH }},Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,${{ env.DENY_TOOLS }}"
+            --json-schema '${{ env.REVIEW_SCHEMA }}'
+
+      - name: Record first review
+        if: steps.result.outputs.has_changes == 'true'
+        id: verdict1
+        env:
+          OUT: ${{ steps.review1.outputs.structured_output }}
+          VALID: ${{ steps.validate1.outcome }}
+        run: |
+          if [ -n "$OUT" ]; then printf '%s' "$OUT"; else echo '{}'; fi > review1.json
+          v="$(python3 -c 'import json;print(json.load(open("review1.json")).get("verdict","BLOCK"))' 2>/dev/null || echo BLOCK)"
+          if [ "$VALID" != "success" ] && [ "$v" = "APPROVE" ]; then v="REQUEST_CHANGES"; fi
+          echo "verdict=$v" >> "$GITHUB_OUTPUT"
+          echo "First review: $v (validator: $VALID)"
+
+      # ---------------------------------------------- one automatic fix cycle
+      - name: Claude fixes review findings
+        if: steps.result.outputs.has_changes == 'true' && steps.verdict1.outputs.verdict != 'APPROVE'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            ${{ env.update }}
+
+            ## Fix cycle
+            Your previous changes (see `git diff origin/main`) did not pass the release gate.
+            Reviewer verdict and findings are in `review1.json`; validator output is in `validate.txt`.
+            Fix every finding. If a change cannot be made safely, revert that file with
+            `git checkout origin/main -- <file>`. Re-run the validator until it passes and
+            update `RUN_SUMMARY.md` and `CHANGELOG.md` to match.
+          claude_args: >-
+            --model ${{ env.MODEL }} --max-turns 30
+            --allowedTools "Read,Glob,Grep,${{ env.WRITE_TOOLS }},${{ env.ALLOWED_FETCH }},Bash(python3 ${{ env.TRUSTED }}/scripts/validate.py:*),Bash(git diff:*),Bash(git status:*),Bash(git show:*),Bash(git checkout origin/main --:*)"
+            --disallowedTools "${{ env.DENY_TOOLS }}"
+
+      - name: Tamper check + re-validate
+        if: steps.result.outputs.has_changes == 'true' && steps.verdict1.outputs.verdict != 'APPROVE'
+        id: validate2
+        continue-on-error: true
+        shell: bash
+        env:
+          EXPECT_TRUSTED: ${{ steps.pin.outputs.trusted }}
+          EXPECT_GITMETA: ${{ steps.pin.outputs.gitmeta }}
+          EXPECT_GITCONFIG: ${{ steps.pin.outputs.gitconfig }}
+        run: bash "$TRUSTED/scripts/post_bot_check.sh" 2>&1 | tee validate.txt
+
+      - name: Package proposal (kit content only)
+        if: steps.check.outcome == 'success'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/proposal"
+          # shellcheck disable=SC2086
+          git ls-files --others --exclude-standard -z -- $KIT_PATHS | xargs -0 -r git add -N --
+          # shellcheck disable=SC2086
+          git diff --binary origin/main -- $KIT_PATHS > "$RUNNER_TEMP/proposal/kit.patch"
+          for f in RUN_SUMMARY.md review.json validate.txt UPSTREAM_REPORT.md; do
+            if [ -f "$f" ]; then cp "$f" "$RUNNER_TEMP/proposal/"; fi
+          done
+          chmod -R u+w "$STATE_OUT"
+          cp -r "$STATE_OUT" "$RUNNER_TEMP/proposal/state"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outcome == 'success'
+        with:
+          name: proposal
+          path: ${{ runner.temp }}/proposal/
+          retention-days: 30
+
+  # ======================================================================= review
+  # The release gate. Fresh checkout of main; the patch is filtered to kit paths
+  # before it is applied; Claude reviews with NO write tools; verdict comes from here.
+  review:
+    needs: propose
+    if: needs.propose.result == 'success' && needs.propose.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    outputs:
+      verdict: ${{ steps.gate.outputs.verdict }}
+    env:
+      MODEL: ${{ vars.CLAUDE_MODEL || 'sonnet' }}
+      REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL || 'opus' }}
+      G: ${{ github.workspace }}/../guardrails
+      GIT_CONFIG_COUNT: "2"
+      GIT_CONFIG_KEY_0: core.fsmonitor
+      GIT_CONFIG_VALUE_0: "false"
+      GIT_CONFIG_KEY_1: core.hooksPath
+      GIT_CONFIG_VALUE_1: /dev/null
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: proposal
+          path: ${{ runner.temp }}/proposal
+
+      - name: Pin guardrails, filter and apply the patch
+        id: apply
+        shell: bash
+        run: |
+          mkdir -p "$G" && git archive HEAD scripts .github/automation | tar -x -C "$G" && chmod -R a-w "$G"
+          bash "$G/scripts/apply_proposal.sh" "$RUNNER_TEMP/proposal/kit.patch"
+          {
+            echo "review<<__PROMPT_EOF__"
+            cat "$G/.github/automation/review-prompt.md"
+            echo "__PROMPT_EOF__"
+          } >> "$GITHUB_ENV"
+          if python3 "$G/scripts/validate.py" --root . --base origin/main --bot > validate.txt 2>&1; then
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat validate.txt
+
+      - name: Independent release review (read-only)
+        id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: ${{ env.review }}
+          claude_args: >-
+            --model ${{ env.REVIEW_MODEL }} --max-turns 30
+            --allowedTools "Read,Glob,Grep,${{ env.ALLOWED_FETCH }},Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)"
+            --disallowedTools "Edit,Write,NotebookEdit,${{ env.DENY_TOOLS }}"
+            --json-schema '${{ env.REVIEW_SCHEMA }}'
+
+      - name: Gate decision
+        id: gate
+        env:
+          OUT: ${{ steps.review.outputs.structured_output }}
+          VALID: ${{ steps.apply.outputs.valid }}
+        run: |
+          if [ -n "$OUT" ]; then printf '%s' "$OUT"; else echo '{}'; fi > "$RUNNER_TEMP/review.json"
+          v="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("verdict","BLOCK"))' "$RUNNER_TEMP/review.json" 2>/dev/null || echo BLOCK)"
+          case "$v" in APPROVE|REQUEST_CHANGES|BLOCK) ;; *) v=BLOCK ;; esac
+          [ "$VALID" = "true" ] || v=BLOCK
+          echo "verdict=$v" >> "$GITHUB_OUTPUT"
+          echo "### Release gate: $v" >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p "$RUNNER_TEMP/gate" && cp "$RUNNER_TEMP/review.json" validate.txt "$RUNNER_TEMP/gate/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gate
+          path: ${{ runner.temp }}/gate/
+
+  # ========================================================================= ship
+  ship:
+    needs: [propose, review]
+    if: always() && needs.propose.result == 'success' && (needs.review.result == 'success' || needs.review.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      HAS_CHANGES: ${{ needs.propose.outputs.has_changes }}
+      VERDICT: ${{ needs.review.outputs.verdict || 'BLOCK' }}
+    steps:
+      - uses: actions/checkout@v4             # pristine main; the bot never touched this workspace
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup (pin guardrail scripts before anything is applied)
+        run: |
+          git config user.name  "claude-kit-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config core.hooksPath /dev/null
+          G="$RUNNER_TEMP/guardrails"
+          mkdir -p "$G" && git archive HEAD scripts | tar -x -C "$G" && chmod -R a-w "$G"
+          echo "G=$G" >> "$GITHUB_ENV"
+          echo "P=$RUNNER_TEMP/proposal" >> "$GITHUB_ENV"
+
+      - name: Release any merged-but-unreleased version
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+        run: bash "$G/scripts/release.sh" "$(git rev-parse HEAD)"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: proposal
+          path: ${{ runner.temp }}/proposal
+
+      - uses: actions/download-artifact@v4
+        if: env.HAS_CHANGES == 'true'
+        with:
+          name: gate
+          path: ${{ runner.temp }}/gate
+
+      - name: Apply the filtered patch and re-validate
+        if: env.HAS_CHANGES == 'true'
+        id: apply
+        shell: bash
+        run: |
+          branch="auto-update/$(date -u +%Y%m%d-%H%M%S)"
+          git switch -c "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          bash "$G/scripts/apply_proposal.sh" "$P/kit.patch"
+          verdict="$VERDICT"
+          if ! python3 "$G/scripts/validate.py" --root . --base origin/main --bot > "$RUNNER_TEMP/validate.txt" 2>&1; then verdict="BLOCK"; fi
+          cat "$RUNNER_TEMP/validate.txt"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version and stamp changelog
+        if: env.HAS_CHANGES == 'true'
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Never reuse a version claimed by an auto-update PR that is still open (held for review).
+          floor="$(gh pr list --state open --search 'in:title Auto-update' --json title -q '.[].title' | sed -n 's/^Auto-update: v//p' | sort -V | tail -n 1)"
+          python3 "$G/scripts/bump_version.py" --root . --floor "${floor:-0.0.0}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, push and open PR
+        if: env.HAS_CHANGES == 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          PUSH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          BRANCH: ${{ steps.apply.outputs.branch }}
+          VERSION: ${{ steps.version.outputs.version }}
+          GATE: ${{ steps.apply.outputs.verdict }}
+        shell: bash
+        run: |
+          # shellcheck disable=SC2086
+          git add -A -- $KIT_PATHS VERSION
+          git commit --no-verify -q \
+            -m "chore(auto-update): v$VERSION — sync with upstream Claude Code / AI-security changes" \
+            -m "Release gate: $GATE. Generated by the auto-update workflow."
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c http.https://github.com/.extraheader="$auth" push -q origin "HEAD:refs/heads/$BRANCH"
+          python3 "$G/scripts/pr_body.py" --version "$VERSION" --verdict "$GATE" \
+            --summary "$P/RUN_SUMMARY.md" --review "$RUNNER_TEMP/gate/review.json" --validator "$RUNNER_TEMP/validate.txt" > "$RUNNER_TEMP/pr-body.md"
+          url="$(gh pr create --base main --head "$BRANCH" --title "Auto-update: v$VERSION" --body-file "$RUNNER_TEMP/pr-body.md")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          if grep -qiE '^#+ *needs a human' "$P/RUN_SUMMARY.md" 2>/dev/null; then
+            gh issue create --title "Auto-update v$VERSION: installer/hook change needs a maintainer" \
+              --body "The update run found a change it is not allowed to make itself. See $url (section 'Needs a human')."
+          fi
+
+      - name: Auto-merge
+        if: env.HAS_CHANGES == 'true' && steps.apply.outputs.verdict == 'APPROVE' && vars.AUTO_MERGE != 'false'
+        id: merge
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          URL: ${{ steps.pr.outputs.url }}
+        shell: bash
+        run: |
+          if gh pr merge "$URL" --squash --delete-branch; then
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+            echo "sha=$(gh pr view "$URL" --json mergeCommit -q .mergeCommit.oid)" >> "$GITHUB_OUTPUT"
+          else
+            # Branch protection with required checks: GitHub merges once checks pass,
+            # and validate.yml (or the next run of this workflow) releases from main.
+            gh pr merge "$URL" --squash --delete-branch --auto
+            echo "merged=queued" >> "$GITHUB_OUTPUT"
+            echo "Auto-merge enabled; the release happens when required checks pass." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Release
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          SHA: ${{ steps.merge.outputs.sha }}
+        run: |
+          git fetch -q origin main 2>/dev/null || true
+          bash "$G/scripts/release.sh" "$SHA" || {
+            echo "::warning::Merged but the release failed; the next run (or the push to main) retries it."
+          }
+
+      - name: Hold for human review
+        if: env.HAS_CHANGES == 'true' && (steps.apply.outputs.verdict != 'APPROVE' || vars.AUTO_MERGE == 'false' || steps.merge.outcome == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.pr.outputs.url }}
+          GATE: ${{ steps.apply.outputs.verdict }}
+        run: |
+          gh label create needs-human-review --color B60205 --force >/dev/null 2>&1 || true
+          gh pr edit "$URL" --add-label needs-human-review
+          gh pr comment "$URL" --body "Release gate verdict **$GATE**, AUTO_MERGE=false, or the merge could not be completed. Not merged; nothing was shipped to installed machines."
+
+      - name: Save watcher state
+        env:
+          PUSH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+        shell: bash
+        run: |
+          # Commit the state to the orphan branch automation-state without touching main.
+          export GIT_INDEX_FILE="$RUNNER_TEMP/state.index"
+          rm -f "$GIT_INDEX_FILE"
+          git --work-tree="$P/state" add -A .
+          tree="$(git write-tree)"
+          commit="$(git commit-tree "$tree" -m "watcher state $(date -u +%FT%TZ)")"
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          git -c http.https://github.com/.extraheader="$auth" push -q --force origin "$commit:refs/heads/automation-state"
+
+      - name: Report persistent source failures
+        if: needs.propose.outputs.failing_sources != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCES: ${{ needs.propose.outputs.failing_sources }}
+        run: |
+          gh issue list --state open --search "in:title Upstream sources failing" --json number -q '.[0].number' | grep -q . ||
+            gh issue create --title "Upstream sources failing: $SOURCES" \
+              --body "These watched sources failed 5+ runs in a row. Update their URLs in \`.github/automation/sources.json\`."
+
+  # =============================================================== report-failure
+  report-failure:
+    needs: [propose, review, ship]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh issue list --state open --search "in:title Auto-update pipeline failed" --json number -q '.[0].number' | grep -q . ||
+            gh issue create --title "Auto-update pipeline failed" \
+              --body "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Nothing was released; the next scheduled run retries."
