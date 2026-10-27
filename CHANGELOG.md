@@ -2,7 +2,9 @@
 
 ## v1.4.0 — 2026-10-27
 - **Measured:** the same `/build` task (pagination + ownership check, 2 files, tests) cost $1.28 and 380 s of model time on v1.0, about $0.30 and 70–95 s on v1.3.0, and about $0.33–0.38 and 73–95 s on v1.4.0, with tests passing on every version. v1.4.0 costs slightly more than v1.3.0 because its reviewer can now actually read the security standard; on v1.3.0 that read was stuck behind a permission prompt.
-- **Effort per agent:** `effort: high` for planner and reviewer, `medium` for coder and researcher, `low` for cleaner.
+- **Evals:** `scripts/run_evals.py` runs the kit on real tasks (a bug fix, a path-traversal fix and an authZ + pagination feature), grades them with hidden acceptance tests, and enforces cost and time budgets. They run in the new Evals workflow and as a release gate in the auto-update pipeline, where a failing update is held for human review.
+- **Fewer review cycles:** for security fixes the lead writes the attack cases as failing tests before fixing, and re-reviews continue the same reviewer instead of starting a fresh one. The path-traversal eval dropped from $1.12–1.17 to about $0.56–0.85.
+- **Effort per agent:** `medium` for coder and researcher, `low` for cleaner. Planner and reviewer keep the model default: forcing `high` cost about 20% more in evals with no accuracy gain.
 - **Parallelism where it pays:** `/build` uses parallel Explore scouts to locate code, runs the test suite while the reviewer works, and runs coders in parallel only on independent multi-file steps.
 - **Per-call model/effort:** tier S reviews that touch no trust boundary run on Sonnet; mechanical coder steps run at `effort: low`.
 - **No permission stalls:** installers add a read-only `Read(~/.claude/standards/**)` permission so agents read the standard without a prompt.

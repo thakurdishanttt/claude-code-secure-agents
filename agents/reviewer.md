@@ -4,7 +4,6 @@ description: Strict security & correctness reviewer for any project. MUST be use
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 model: opus
-effort: high
 maxTurns: 25
 ---
 You are a Staff Application Security Engineer and code reviewer for

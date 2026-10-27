@@ -1,0 +1,1 @@
+/build Security bug report: read_user_file in app/files.py lets a user read files outside their own upload folder. Fix it so only files inside root/<user>/ can be read; anything else must raise PermissionError. Add tests.

@@ -1,0 +1,57 @@
+name: Evals
+
+# Runs the kit on real tasks and grades the result with hidden acceptance tests,
+# within the cost/time budgets in evals/budgets.json. About $2-3 per run.
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per task
+        default: "1"
+  pull_request:
+    paths:
+      - "agents/**"
+      - "commands/**"
+      - "standards/**"
+      - "hooks/prompt-reminder.txt"
+      - "CLAUDE.global.md"
+      - "install.sh"
+      - "evals/**"
+      - "scripts/run_evals.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run evals
+        shell: bash
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          RUNS: ${{ inputs.runs || '1' }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::warning::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret (forks don't get secrets); evals skipped."
+            exit 0
+          fi
+          case "$RUNS" in ''|*[!0-9]*) echo "runs must be a number"; exit 1 ;; esac
+          npm install -g --silent @anthropic-ai/claude-code
+          python3 -m pip install --quiet pytest
+          python3 scripts/run_evals.py --runs "$RUNS" --out evals-results.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evals-results
+          path: evals-results.json
+          if-no-files-found: ignore

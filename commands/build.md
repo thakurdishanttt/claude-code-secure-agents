@@ -96,6 +96,12 @@ scope or security posture, get my re-approval.
 ## Gate 3 — Implement
 - Tier S and M: implement yourself and run the relevant tests. At most one
   **coder** (with a context pack) if the change would overflow your context.
+- Security-relevant change (any tier): before writing the fix, list the
+  attack inputs from the standard sections that apply (e.g. §11 Paths: `..`,
+  absolute paths, symlinks, sibling-prefix dirs, every user-controlled
+  parameter, not just the obvious one) and write them as failing tests
+  first. The review should confirm the fix, not discover it: each review
+  cycle costs an Opus re-read.
 - Tier L: for each wave, one **coder** per step, all in one message.
 - Wait for every coder; each must report verification output. Resolve any
   request for a file outside a coder's list before continuing.
@@ -108,7 +114,9 @@ Launch the reviewer(s), then run Gate 6's tests yourself while they work.
 - Any **BLOCK** or **REQUEST CHANGES** → fix small findings yourself; send
   larger ones, grouped by file, to **coder** agents (in parallel for
   disjoint files). Then re-run only the
-  reviewers that did not approve, scoped to the files that changed. Maximum
+  reviewers that did not approve, scoped to the files that changed. Continue
+  the same reviewer (SendMessage to its agent id) with a short list of what
+  changed, rather than starting a fresh one that re-reads everything. Maximum
   3 cycles; if still not approved, stop and escalate to me with the
   outstanding findings.
 - All **APPROVE** → continue.
