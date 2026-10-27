@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.0 — 2026-10-27
+- **Faster, cheaper default:** global rules and the per-prompt reminder now say "work directly by default"; the full agent chain runs only through `/build`. The per-prompt reminder no longer pushes the agent team on every message.
+- **Agent triggers:** the planner auto-runs only for tier L work (was: any change touching more than one file); the reviewer is no longer auto-spawned for questions and trivial one-line edits; the cleaner runs only when the reviewer flags dead code.
+- **`/build` tier M:** the lead writes a short plan and implements itself (no fresh planner and coder re-reading the codebase), then one reviewer. It waits for approval only when the change adds a dependency or touches auth, secrets, crypto, model-callable tools or data deletion. Small review findings are fixed by the lead instead of a new coder.
+- **Tighter caps:** `maxTurns` planner 25, reviewer 25, coder 40, researcher 15, cleaner 15; reviewer report capped at ~500 words.
+- **Main session reads the standard via its index,** not the full file.
+
 ## v1.2.0 — 2026-10-22
 - **Token efficiency:** `/build` now sizes work into tiers S/M/L (small changes: lead + 1 reviewer; default: planner → coder → 1 reviewer; full parallel pipeline only for large or boundary-crossing work). Every phase still has its gate.
 - **Standard index** (`standards/ai-security-index.md`): agents read only the sections a change touches.

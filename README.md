@@ -53,7 +53,8 @@ The kit is built to spend tokens only where they buy accuracy:
 
 | Lever | What it does |
 |---|---|
-| `/build` tiers S / M / L | Small changes: you + 1 reviewer. Default: planner → coder → 1 reviewer. Only large or boundary-crossing work gets parallel research, split security ‖ correctness reviews and cleaners. |
+| `/build` tiers S / M / L | Small and default-size changes: the lead plans and implements itself (it has already read the code), then 1 reviewer. Only large or boundary-crossing work gets a planner, parallel coders and split security ‖ correctness reviews; cleaners run only when the reviewer flags dead code. |
+| Work directly by default | Outside `/build`, Claude does questions and small edits itself instead of spawning the agent chain. Agent descriptions no longer trigger the planner on every 2-file change or an Opus review on every one-line edit. |
 | Standard index | Agents read `standards/ai-security-index.md` (~600 tokens) and pull only the sections a change touches, instead of the full ~2,700-token standard each time. |
 | Context packs | The lead hands every subagent its exact files, standard sections, research and callers, so agents don't rediscover the codebase. |
 | Right-sized models + caps | Opus for planning and the security gate, Sonnet for coding and research, Haiku for mechanical cleanup; `maxTurns` on every agent. |

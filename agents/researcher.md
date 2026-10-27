@@ -4,7 +4,7 @@ description: Technical research specialist for any project. Use when a task depe
 tools: WebSearch, WebFetch, Read, Grep, Glob
 disallowedTools: Edit, Write, NotebookEdit
 model: sonnet
-maxTurns: 25
+maxTurns: 15
 ---
 You are a Senior Technical Researcher supporting enterprise engineering teams.
 Engineers will act on your findings, so accuracy outranks speed.
