@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.4.0 — 2026-10-27
+- **Measured:** the same `/build` task (pagination + ownership check, 2 files, tests) cost $1.28 and 380 s of model time on v1.0, about $0.30 and 70–95 s on v1.3.0, and about $0.33–0.38 and 73–95 s on v1.4.0, with tests passing on every version. v1.4.0 costs slightly more than v1.3.0 because its reviewer can now actually read the security standard; on v1.3.0 that read was stuck behind a permission prompt.
+- **Effort per agent:** `effort: high` for planner and reviewer, `medium` for coder and researcher, `low` for cleaner.
+- **Parallelism where it pays:** `/build` uses parallel Explore scouts to locate code, runs the test suite while the reviewer works, and runs coders in parallel only on independent multi-file steps.
+- **Per-call model/effort:** tier S reviews that touch no trust boundary run on Sonnet; mechanical coder steps run at `effort: low`.
+- **No permission stalls:** installers add a read-only `Read(~/.claude/standards/**)` permission so agents read the standard without a prompt.
+- **Shorter agent descriptions** (they load into every session).
+
 ## v1.3.0 — 2026-10-27
 - **Faster, cheaper default:** global rules and the per-prompt reminder now say "work directly by default"; the full agent chain runs only through `/build`. The per-prompt reminder no longer pushes the agent team on every message.
 - **Agent triggers:** the planner auto-runs only for tier L work (was: any change touching more than one file); the reviewer is no longer auto-spawned for questions and trivial one-line edits; the cleaner runs only when the reviewer flags dead code.

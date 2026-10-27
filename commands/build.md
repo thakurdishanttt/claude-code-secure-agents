@@ -39,6 +39,32 @@ only where independence adds accuracy (the reviewer) or parallelism pays off
 A security-relevant change is never tier S if it touches authN/authZ,
 secrets, crypto, or model-callable tools — use at least M.
 
+## Parallelism (fast, without paying twice)
+Parallel agents cut wall-clock time, but each one re-reads its context, so
+run things in parallel only when they are truly independent:
+- **Locate code with scouts** (M, L) when you don't already know where the
+  change goes in a large codebase: launch 2–4 built-in **Explore** agents in
+  ONE message, one per area, each asked for `file:line` locations only. They
+  run on a small model and keep file dumps out of your context.
+- **Review while testing** (every tier): start the reviewer, then run the
+  test suite yourself while it works. Neither depends on the other.
+- **Parallel coders** (M, L): when the plan has two or more independent
+  steps on disjoint files, each touching several files, launch one
+  **coder** per step in ONE message. For small steps, do them yourself in
+  sequence; a coder's start-up read costs more than it saves.
+- **Parallel research** (L): one **researcher** per open question, in ONE
+  message.
+- Never: two coders on one file, or parallel agents re-checking the same
+  thing.
+
+## Model and effort per call
+Pass `model` / `effort` on the Agent call when the default is more than the
+job needs:
+- Tier S reviewer on a change that touches no trust boundary:
+  `model: sonnet`. Every other review keeps its default (Opus).
+- A coder on a mechanical step (rename, wiring, test scaffolding):
+  `effort: low`.
+
 ## Context packs (every delegation)
 Give each subagent a self-contained brief instead of letting it rediscover:
 its goal or step, the exclusive file list, acceptance criteria, the
@@ -75,6 +101,7 @@ scope or security posture, get my re-approval.
   request for a file outside a coder's list before continuing.
 
 ## Gate 4 — Review (mandatory at every tier)
+Launch the reviewer(s), then run Gate 6's tests yourself while they work.
 - Tier S and M: one **reviewer**, focus `full`, scoped to the changed files.
 - Tier L: in ONE message, **reviewer** `security` ‖ **reviewer**
   `correctness`, split by file area when the change set exceeds ~15 files.

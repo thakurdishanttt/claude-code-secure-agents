@@ -142,7 +142,7 @@ Use the researcher agent: is library X affected by any CVEs?
 
 1. Delete every file listed in `~/.claude/enterprise-agents/manifest.txt`, then the `~/.claude/enterprise-agents/` folder.
 2. In `~/.claude/CLAUDE.md`, remove everything between `<!-- BEGIN claude-enterprise-agents -->` and `<!-- END claude-enterprise-agents -->`.
-3. Remove the `prompt-reminder` and `self-update` hooks with `/hooks`, or delete their entries in `~/.claude/settings.json`. You can also restore a `settings.json.bak-*` backup.
+3. Remove the `prompt-reminder` and `self-update` hooks with `/hooks`, or delete their entries in `~/.claude/settings.json`, along with the `Read(~/.claude/standards/**)` permission rule. You can also restore a `settings.json.bak-*` backup.
 
 ## 8. Troubleshooting
 
