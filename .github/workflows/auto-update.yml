@@ -352,7 +352,7 @@ jobs:
     needs: [propose, review]
     if: always() && needs.propose.result == 'success' && (needs.review.result == 'success' || needs.review.result == 'skipped')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: write
       pull-requests: write
@@ -372,7 +372,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config core.hooksPath /dev/null
           G="$RUNNER_TEMP/guardrails"
-          mkdir -p "$G" && git archive HEAD scripts | tar -x -C "$G" && chmod -R a-w "$G"
+          mkdir -p "$G" && git archive HEAD scripts evals | tar -x -C "$G" && chmod -R a-w "$G"
           echo "G=$G" >> "$GITHUB_ENV"
           echo "P=$RUNNER_TEMP/proposal" >> "$GITHUB_ENV"
 
@@ -396,6 +396,10 @@ jobs:
         if: env.HAS_CHANGES == 'true'
         id: apply
         shell: bash
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          EVALS_ENABLED: ${{ vars.EVALS_ENABLED || 'true' }}
         run: |
           branch="auto-update/$(date -u +%Y%m%d-%H%M%S)"
           git switch -c "$branch"
@@ -403,6 +407,17 @@ jobs:
           bash "$G/scripts/apply_proposal.sh" "$P/kit.patch"
           verdict="$VERDICT"
           if ! python3 "$G/scripts/validate.py" --root . --base origin/main --bot > "$RUNNER_TEMP/validate.txt" 2>&1; then verdict="BLOCK"; fi
+          # Eval gate: real tasks graded by hidden tests, within cost/time budgets.
+          # Tasks and budgets come from pinned main ($G), so an update cannot change its own exam.
+          if [ "$verdict" = "APPROVE" ] && [ "$EVALS_ENABLED" != "false" ]; then
+            npm install -g --silent @anthropic-ai/claude-code >/dev/null 2>&1 && python3 -m pip install --quiet pytest
+            if python3 "$G/scripts/run_evals.py" --kit . >> "$RUNNER_TEMP/validate.txt" 2>&1; then
+              echo "Eval gate: PASS" >> "$RUNNER_TEMP/validate.txt"
+            else
+              echo "Eval gate: FAIL (held for human review)" >> "$RUNNER_TEMP/validate.txt"
+              verdict="REQUEST CHANGES"
+            fi
+          fi
           cat "$RUNNER_TEMP/validate.txt"
           echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
 

@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Strict security & correctness reviewer for any project. MUST be used after every multi-file or security-relevant code change (every /build tier) and before merge; skip it for questions and trivial one-line edits. Accepts a focus (security, correctness, or full) and an optional file scope so several reviewers can run in parallel. Returns APPROVE / REQUEST CHANGES / BLOCK. Read-only.
+description: Strict security & correctness reviewer for any project. MUST be used after every multi-file or security-relevant code change (every /build tier) and before merge; skip it for questions and trivial one-line edits. Takes a focus (security, correctness, full) and a file scope. Returns APPROVE / REQUEST CHANGES / BLOCK. Read-only.
 tools: Read, Grep, Glob, Bash
 disallowedTools: Edit, Write, NotebookEdit
 model: opus

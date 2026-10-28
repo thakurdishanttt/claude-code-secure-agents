@@ -134,9 +134,14 @@ fi
 SETTINGS="$CLAUDE_HOME/settings.json"
 REMINDER_CMD="cat \"$CLAUDE_HOME/hooks/$REMINDER_MARKER\""
 UPDATE_CMD="bash \"$CLAUDE_HOME/hooks/self-update.sh\""
+# Read-only access to the standard, so agents can read it without a permission prompt.
+case "$CLAUDE_HOME" in
+  "$HOME"/*) READ_RULE="Read(~/${CLAUDE_HOME#"$HOME"/}/standards/**)" ;;
+  *)         READ_RULE="Read(/${CLAUDE_HOME}/standards/**)" ;;
+esac
 MERGE='
 import json, os, sys
-p, out, rcmd, rmark, ucmd, umark, auto = sys.argv[1:8]
+p, out, rcmd, rmark, ucmd, umark, auto, rrule = sys.argv[1:9]
 s = {}
 if os.path.exists(p) and open(p, encoding="utf-8").read().strip():
     s = json.load(open(p, encoding="utf-8"))
@@ -153,23 +158,29 @@ if auto == "0" and has("SessionStart", umark):
     hooks["SessionStart"] = [e for e in hooks["SessionStart"] if not any(umark in h.get("command", "") for h in e.get("hooks", []))]
     if not hooks["SessionStart"]: del hooks["SessionStart"]
     print("  removed self-update hook (auto-update disabled)")
+allow = s.setdefault("permissions", {}).setdefault("allow", [])
+if rrule not in allow:
+    allow.append(rrule)
+    print("  allowed reading the standard without prompts")
 json.dump(s, open(out, "w", encoding="utf-8"), indent=2)
 open(out, "a", encoding="utf-8").write("\n")
 '
 NEW_SETTINGS="$STAGE/settings.json"
 if command -v python3 >/dev/null 2>&1; then
-  python3 -c "$MERGE" "$SETTINGS" "$NEW_SETTINGS" "$REMINDER_CMD" "$REMINDER_MARKER" "$UPDATE_CMD" "$UPDATE_MARKER" "$AUTO_UPDATE" | while read -r l; do say "$l"; done
+  python3 -c "$MERGE" "$SETTINGS" "$NEW_SETTINGS" "$REMINDER_CMD" "$REMINDER_MARKER" "$UPDATE_CMD" "$UPDATE_MARKER" "$AUTO_UPDATE" "$READ_RULE" | while read -r l; do say "$l"; done
 elif command -v node >/dev/null 2>&1; then
   node -e '
-    const fs=require("fs"); const [p,out,rcmd,rmark,ucmd,umark,auto]=process.argv.slice(1);
+    const fs=require("fs"); const [p,out,rcmd,rmark,ucmd,umark,auto,rrule]=process.argv.slice(1);
     let s={}; if (fs.existsSync(p) && fs.readFileSync(p,"utf8").trim()) s=JSON.parse(fs.readFileSync(p,"utf8"));
     const hooks=s.hooks=s.hooks||{};
     const has=(ev,m)=>(hooks[ev]||[]).some(e=>(e.hooks||[]).some(h=>(h.command||"").includes(m)));
     if(!has("UserPromptSubmit",rmark)){(hooks.UserPromptSubmit=hooks.UserPromptSubmit||[]).push({hooks:[{type:"command",command:rcmd,timeout:10}]});console.log("  added rules hook (UserPromptSubmit)");}
     if(auto==="1"&&!has("SessionStart",umark)){(hooks.SessionStart=hooks.SessionStart||[]).push({matcher:"startup",hooks:[{type:"command",command:ucmd,async:true,timeout:120}]});console.log("  added self-update hook (SessionStart)");}
     if(auto==="0"&&has("SessionStart",umark)){hooks.SessionStart=hooks.SessionStart.filter(e=>!(e.hooks||[]).some(h=>(h.command||"").includes(umark)));if(!hooks.SessionStart.length)delete hooks.SessionStart;console.log("  removed self-update hook (auto-update disabled)");}
+    const perms=s.permissions=s.permissions||{}; const allow=perms.allow=perms.allow||[];
+    if(!allow.includes(rrule)){allow.push(rrule);console.log("  allowed reading the standard without prompts");}
     fs.writeFileSync(out, JSON.stringify(s,null,2)+"\n");
-  ' "$SETTINGS" "$NEW_SETTINGS" "$REMINDER_CMD" "$REMINDER_MARKER" "$UPDATE_CMD" "$UPDATE_MARKER" "$AUTO_UPDATE" | while read -r l; do say "$l"; done
+  ' "$SETTINGS" "$NEW_SETTINGS" "$REMINDER_CMD" "$REMINDER_MARKER" "$UPDATE_CMD" "$UPDATE_MARKER" "$AUTO_UPDATE" "$READ_RULE" | while read -r l; do say "$l"; done
 else
   NEW_SETTINGS=""
   echo "  WARNING: python3/node not found - add the hooks manually (see INTEGRATION.md, section 4)." >&2

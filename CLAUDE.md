@@ -30,4 +30,6 @@ release. Treat every change as a production deploy to the whole fleet.
 - Keep `__CLAUDE_HOME__` placeholders; the installers substitute real paths.
 - Verify Claude Code behaviour against the official docs
   (https://code.claude.com/docs) before relying on it.
-- Run `python3 scripts/validate.py` before finishing.
+- Run `python3 scripts/validate.py` before finishing. For changes to agents,
+  commands or the standard, also run `python3 scripts/run_evals.py` (costs ~$2)
+  and report its table.

@@ -157,6 +157,22 @@ if (-not $autoUpdate -and (Test-Marker $ss $updateMarker)) {
     if ($kept.Count) { Set-Event 'SessionStart' $kept } else { $settings.hooks.PSObject.Properties.Remove('SessionStart') }
     Say "  removed self-update hook (auto-update disabled)"
 }
+# Read-only access to the standard, so agents can read it without a permission prompt.
+$homeFwd = $env:USERPROFILE -replace '\\', '/'
+if ($homeFwd -and $fwd.StartsWith("$homeFwd/", [StringComparison]::OrdinalIgnoreCase)) {
+    $readRule = "Read(~/$($fwd.Substring($homeFwd.Length + 1))/standards/**)"
+    if (-not ($settings.PSObject.Properties.Name -contains 'permissions')) {
+        $settings | Add-Member -NotePropertyName permissions -NotePropertyValue (New-Object PSObject)
+    }
+    $allow = @()
+    if ($settings.permissions.PSObject.Properties.Name -contains 'allow') { $allow = @($settings.permissions.allow) }
+    if ($allow -notcontains $readRule) {
+        $allow += $readRule
+        if ($settings.permissions.PSObject.Properties.Name -contains 'allow') { $settings.permissions.allow = $allow }
+        else { $settings.permissions | Add-Member -NotePropertyName allow -NotePropertyValue $allow }
+        Say "  allowed reading the standard without prompts"
+    }
+}
 # Windows PowerShell 5.1 adds a Count/value wrapper to arrays in JSON unless this type data is removed.
 Remove-TypeData -TypeName System.Array -ErrorAction SilentlyContinue
 $json = $settings | ConvertTo-Json -Depth 50

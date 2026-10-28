@@ -142,7 +142,7 @@ Use the researcher agent: is library X affected by any CVEs?
 
 1. Delete every file listed in `~/.claude/enterprise-agents/manifest.txt`, then the `~/.claude/enterprise-agents/` folder.
 2. In `~/.claude/CLAUDE.md`, remove everything between `<!-- BEGIN claude-enterprise-agents -->` and `<!-- END claude-enterprise-agents -->`.
-3. Remove the `prompt-reminder` and `self-update` hooks with `/hooks`, or delete their entries in `~/.claude/settings.json`. You can also restore a `settings.json.bak-*` backup.
+3. Remove the `prompt-reminder` and `self-update` hooks with `/hooks`, or delete their entries in `~/.claude/settings.json`, along with the `Read(~/.claude/standards/**)` permission rule. You can also restore a `settings.json.bak-*` backup.
 
 ## 8. Troubleshooting
 
@@ -152,6 +152,7 @@ Use the researcher agent: is library X affected by any CVEs?
 | Hook not running | Run `/hooks` once to reload, or restart. Check `settings.json` is valid JSON, because one syntax error disables the whole file. |
 | `cat` not found (Windows) | Claude Code runs hooks in Git Bash or PowerShell, and both support `cat`. If you use another shell, change the command to `type "C:\path\to\prompt-reminder.txt"`. |
 | Hooks ignored on a company laptop | Your organisation may enforce managed settings (`allowManagedHooksOnly`). Ask IT to deploy the hook through managed settings. `CLAUDE.md` and the agents still work. |
+| Agent fails with a model error | Your organisation may not allow Opus. Ask IT to allow it, or change `model: opus` to `model: sonnet` in `agents/planner.md` and `agents/reviewer.md` in your internal mirror of this repo (local edits in `~/.claude/agents/` are overwritten by the next update). |
 | PowerShell blocks the script | Use the `-ExecutionPolicy Bypass` form shown above. It only applies to that one run. |
 
 ## 9. Important notes

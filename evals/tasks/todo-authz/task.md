@@ -1,0 +1,1 @@
+/build Add pagination to list_todos (limit default 20, max 100, offset >= 0, reject invalid values with ValidationError) and make delete_todo only delete todos owned by the calling user (return False otherwise). Add tests.

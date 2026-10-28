@@ -1,0 +1,6 @@
+{
+  "_comment": "Per-task limits, about 1.5x the measured average. A run fails if any hidden acceptance test fails or a budget is exceeded. Raise a budget only with a measured reason in the PR.",
+  "chunk-bug":      {"max_cost_usd": 0.30, "max_seconds": 150},
+  "path-traversal": {"max_cost_usd": 1.00, "max_seconds": 360},
+  "todo-authz":     {"max_cost_usd": 0.55, "max_seconds": 200}
+}
