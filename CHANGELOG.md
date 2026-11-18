@@ -1,7 +1,8 @@
 # Changelog
 
 
-## Unreleased
+## v1.4.1 — 2026-11-18 (automated)
+- Documented minimum safe Claude Code version 2.1.251 in `INTEGRATION.md` (Requirements), covering recent high-severity advisories (GHSA-5xjx-9qx6-jcrv, GHSA-pq7j-f95f-qfcv, GHSA-7835-87q9-rgvv).
 - Added `SECURITY.md`, `CONTRIBUTING.md`, `CODEOWNERS`, PR and issue templates.
 - Added `docs/compliance.md`: how the kit supports SOC 2, ISO/IEC 27001:2022, PCI DSS v4.0 and NIST SSDF evidence, and what it doesn't cover.
 - Fixed: the auto-update pipeline stopped opening "pipeline failed" issues after the first one was closed, so later failures were silent. Its issue body now names the missing-secret cause.
