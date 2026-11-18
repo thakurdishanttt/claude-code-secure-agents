@@ -1,7 +1,8 @@
 # Changelog
 
 
-## Unreleased
+## v1.4.1 — 2026-11-18 (automated)
+- Docs: `INTEGRATION.md` Requirements now states a minimum recommended Claude Code version (2.1.251) and the fixed-in versions of the recent high-severity advisories (Edit-tool TOCTOU, plugin hash-pin bypass, worktree sandbox escape).
 - Fixed: the auto-update release gate crashed before grading ("Permission denied" on the hidden tests), because the runner copied its read-only pinned task files with their permissions. Task copies are now writable.
 - Evals pin the model (`--model`, default `sonnet`, or `EVAL_MODEL`); budgets are measured on it. Unpinned runs used the CLI's newer default model and went over budget. Measured on Sonnet, 3 runs each: chunk-bug $0.22–0.24, path-traversal $0.63–0.77, todo-authz $0.33–0.39, all hidden tests passing.
 - Failed hidden tests are now named in the eval output.
