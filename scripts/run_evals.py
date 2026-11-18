@@ -10,7 +10,7 @@ The kit is installed into a throwaway HOME, Claude Code runs headless, then
 the hidden tests run. A task passes only if every hidden test passes and the
 run stays within its budget in evals/budgets.json.
 
-Usage: python3 scripts/run_evals.py [--tasks a,b] [--runs N] [--jobs N] [--out results.json] [--kit DIR]
+Usage: python3 scripts/run_evals.py [--tasks a,b] [--runs N] [--jobs N] [--out results.json] [--kit DIR] [--model M]
 Needs: the `claude` CLI, authenticated (ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN), python3 with pytest.
 """
 from __future__ import annotations
@@ -39,13 +39,21 @@ def sh(cmd: list[str], cwd: Path, env: dict | None = None, timeout: int = 120) -
     return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout)
 
 
-def run_one(name: str, run: int, budget: dict, kit: Path) -> dict:
+def make_writable(root: Path) -> None:
+    """copytree keeps permission bits; the release gate pins its copy read-only."""
+    for p in [root, *root.rglob("*")]:
+        if not p.is_symlink():
+            p.chmod(p.stat().st_mode | 0o200)
+
+
+def run_one(name: str, run: int, budget: dict, kit: Path, model: str) -> dict:
     task = TASKS / name
     result = {"task": name, "run": run, "passed": False, "problems": []}
     with tempfile.TemporaryDirectory(prefix=f"eval-{name}-") as tmp:
         home, work = Path(tmp) / "home", Path(tmp) / "work"
         home.mkdir()
         shutil.copytree(task / "repo", work)
+        make_writable(work)
         env = {**os.environ, "HOME": str(home), "CLAUDE_HOME": str(home / ".claude")}
         env.pop("CLAUDE_CONFIG_DIR", None)
         inst = sh(["bash", str(kit / "install.sh"), "--no-auto-update"], kit, env)
@@ -61,6 +69,7 @@ def run_one(name: str, run: int, budget: dict, kit: Path) -> dict:
         start = time.monotonic()
         try:
             p = sh(["claude", "-p", prompt, "--output-format", "json", "--permission-mode", "acceptEdits",
+                    "--model", model,
                     "--allowedTools", *ALLOWED_TOOLS], work, env, RUN_TIMEOUT)
             out = json.loads(p.stdout or "{}")
         except subprocess.TimeoutExpired:
@@ -78,11 +87,16 @@ def run_one(name: str, run: int, budget: dict, kit: Path) -> dict:
         accept_dir = work / "tests"
         accept_dir.mkdir(exist_ok=True)
         for f in (task / "accept").iterdir():
-            shutil.copy2(f, accept_dir / f.name)
-        t = sh([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(accept_dir)], work, timeout=300)
-        result["tests"] = (t.stdout.strip().splitlines() or ["no output"])[-1]
+            dst = accept_dir / f.name
+            dst.unlink(missing_ok=True)
+            shutil.copyfile(f, dst)
+        t = sh([sys.executable, "-m", "pytest", "-q", "-rf", "-p", "no:cacheprovider", str(accept_dir)], work, timeout=300)
+        lines = t.stdout.strip().splitlines() or ["no output"]
+        result["tests"] = lines[-1]
         if t.returncode:
-            result["problems"].append(f"hidden tests failed: {result['tests']}")
+            failed = [ln[7:].split(" - ")[0] for ln in lines if ln.startswith("FAILED ")]
+            result["failed_tests"] = failed
+            result["problems"].append(f"hidden tests failed: {result['tests']}" + (f" ({', '.join(failed[:3])})" if failed else ""))
         if result["cost_usd"] > budget["max_cost_usd"]:
             result["problems"].append(f"cost ${result['cost_usd']} > budget ${budget['max_cost_usd']}")
         if result["seconds"] > budget["max_seconds"]:
@@ -98,6 +112,8 @@ def main() -> int:
     ap.add_argument("--jobs", type=int, default=3, help="runs in parallel")
     ap.add_argument("--out", default="", help="write JSON results here")
     ap.add_argument("--kit", default=str(ROOT), help="kit checkout to install (default: this repo)")
+    ap.add_argument("--model", default=os.environ.get("EVAL_MODEL", "sonnet"),
+                    help="model for the runs; budgets are measured on the default (sonnet)")
     args = ap.parse_args()
 
     if not shutil.which("claude"):
@@ -112,7 +128,7 @@ def main() -> int:
 
     jobs = [(n, r) for n in names for r in range(1, args.runs + 1)]
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        results = list(pool.map(lambda j: run_one(j[0], j[1], budgets[j[0]], Path(args.kit).resolve()), jobs))
+        results = list(pool.map(lambda j: run_one(j[0], j[1], budgets[j[0]], Path(args.kit).resolve(), args.model), jobs))
 
     print(f"{'task':<16} {'run':>3} {'result':<6} {'cost':>7} {'secs':>5}  tests / problems")
     for r in results:
