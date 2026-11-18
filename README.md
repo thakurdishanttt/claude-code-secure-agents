@@ -183,7 +183,10 @@ The full setup guide, covering manual hook setup, customising, uninstalling and 
 ├── scripts/                 check_upstream.py · validate.py · bump_version.py
 ├── .github/workflows/       auto-update.yml (scheduler) · validate.yml (CI)
 ├── .github/automation/      sources.json · update-prompt.md · review-prompt.md
+├── docs/compliance.md       SOC 2 / ISO 27001 / PCI DSS / NIST SSDF mapping
 ├── CLAUDE.md                Maintenance rules for this repo (humans + bot)
+├── SECURITY.md · CONTRIBUTING.md · LICENSE · NOTICE
+├── .github/                 CODEOWNERS · PR and issue templates
 ├── CHANGELOG.md · VERSION
 ```
 

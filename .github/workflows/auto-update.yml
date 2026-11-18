@@ -520,7 +520,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCES: ${{ needs.propose.outputs.failing_sources }}
         run: |
-          gh issue list --state open --search "in:title Upstream sources failing" --json number -q '.[0].number' | grep -q . ||
+          gh issue list --state open --search "in:title Upstream sources failing" --json number -q 'length' | grep -qx '[1-9][0-9]*' ||
             gh issue create --title "Upstream sources failing: $SOURCES" \
               --body "These watched sources failed 5+ runs in a row. Update their URLs in \`.github/automation/sources.json\`."
 
@@ -537,6 +537,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh issue list --state open --search "in:title Auto-update pipeline failed" --json number -q '.[0].number' | grep -q . ||
+          gh issue list --state open --search "in:title Auto-update pipeline failed" --json number -q 'length' | grep -qx '[1-9][0-9]*' ||
             gh issue create --title "Auto-update pipeline failed" \
-              --body "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Nothing was released; the next scheduled run retries."
+              --body "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Nothing was released; the next scheduled run retries. If the Preflight step failed, add the ANTHROPIC_API_KEY (or CLAUDE_CODE_OAUTH_TOKEN) secret under Settings → Secrets and variables → Actions."

@@ -204,3 +204,6 @@ If a gate fails, nothing ships: the PR is labelled `needs-human-review` and an i
 ### Adding a watched source
 Add an entry to `.github/automation/sources.json` (kinds: `changelog`, `page`, `gh_release`, `gh_advisories`) and its host to `allowed_hosts`. Only humans can change this file.
 
+## 12. Compliance
+
+How the kit's controls map to SOC 2, ISO/IEC 27001:2022, PCI DSS v4.0 and NIST SSDF, and what audit evidence they produce: [docs/compliance.md](docs/compliance.md).

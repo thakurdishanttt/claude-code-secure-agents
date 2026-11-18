@@ -2,6 +2,9 @@
 
 
 ## Unreleased
+- Added `SECURITY.md`, `CONTRIBUTING.md`, `CODEOWNERS`, PR and issue templates.
+- Added `docs/compliance.md`: how the kit supports SOC 2, ISO/IEC 27001:2022, PCI DSS v4.0 and NIST SSDF evidence, and what it doesn't cover.
+- Fixed: the auto-update pipeline stopped opening "pipeline failed" issues after the first one was closed, so later failures were silent. Its issue body now names the missing-secret cause.
 - Licensed under Apache-2.0 (`LICENSE`, `NOTICE`); previously no licence file.
 
 ## v1.4.0 — 2026-10-27
