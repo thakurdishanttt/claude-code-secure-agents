@@ -211,3 +211,8 @@ Use the researcher agent: does library X have known CVEs in version 2.x?
 ## Contributing
 
 Issues and pull requests are welcome, especially stack mappings for more languages and new security checks.
+Contributions are accepted under the same licence (Apache-2.0, section 5).
+
+## Licence
+
+[Apache License 2.0](LICENSE) — free to use, modify and redistribute, including commercially, with attribution (see [NOTICE](NOTICE)). Copyright 2026 Alambrix.

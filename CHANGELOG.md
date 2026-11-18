@@ -1,5 +1,9 @@
 # Changelog
 
+
+## Unreleased
+- Licensed under Apache-2.0 (`LICENSE`, `NOTICE`); previously no licence file.
+
 ## v1.4.0 — 2026-10-27
 - **Measured:** the same `/build` task (pagination + ownership check, 2 files, tests) cost $1.28 and 380 s of model time on v1.0, about $0.30 and 70–95 s on v1.3.0, and about $0.33–0.38 and 73–95 s on v1.4.0, with tests passing on every version. v1.4.0 costs slightly more than v1.3.0 because its reviewer can now actually read the security standard; on v1.3.0 that read was stuck behind a permission prompt.
 - **Evals:** `scripts/run_evals.py` runs the kit on real tasks (a bug fix, a path-traversal fix and an authZ + pagination feature), grades them with hidden acceptance tests, and enforces cost and time budgets. They run in the new Evals workflow and as a release gate in the auto-update pipeline, where a failing update is held for human review.
