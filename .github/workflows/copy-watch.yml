@@ -1,0 +1,30 @@
+# Weekly: find public forks and copies of the kit and the skills repo, and post
+# new ones to the "Copy watch" issue. Read-only on GitHub apart from that issue.
+name: Copy watch
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"      # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: copy-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Search GitHub and report
+        env:
+          GH_TOKEN: ${{ github.token }}                   # writes the tracking issue
+          SEARCH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}   # code search needs a user token (fine-grained PAT)
+        run: python3 scripts/copy_watch.py --issue | tee -a "$GITHUB_STEP_SUMMARY"

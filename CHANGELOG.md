@@ -1,6 +1,9 @@
 # Changelog
 
 
+## Unreleased
+- Copy watch (`.github/workflows/copy-watch.yml`, Mondays 04:17 UTC): finds public forks and copies of this kit and the skills repo through forks, exact-name repository search and code search for sentences unique to our files, and posts new findings to one "Copy watch" issue. Read-only apart from that issue; no telemetry is added to the kit.
+
 ## v1.4.1 — 2026-11-18 (automated)
 - Docs: `INTEGRATION.md` Requirements now states a minimum recommended Claude Code version (2.1.251) and the fixed-in versions of the recent high-severity advisories (Edit-tool TOCTOU, plugin hash-pin bypass, worktree sandbox escape).
 - Fixed: the auto-update release gate crashed before grading ("Permission denied" on the hidden tests), because the runner copied its read-only pinned task files with their permissions. Task copies are now writable.

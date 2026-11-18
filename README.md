@@ -181,7 +181,7 @@ The full setup guide, covering manual hook setup, customising, uninstalling and 
 ├── standards/ai-security.md Security standard
 ├── hooks/                   prompt-reminder.txt · self-update.sh · self-update.ps1
 ├── scripts/                 check_upstream.py · validate.py · bump_version.py
-├── .github/workflows/       auto-update.yml (scheduler) · validate.yml (CI)
+├── .github/workflows/       auto-update.yml (scheduler) · validate.yml (CI) · evals.yml · copy-watch.yml (weekly fork/copy report)
 ├── .github/automation/      sources.json · update-prompt.md · review-prompt.md
 ├── docs/compliance.md       SOC 2 / ISO 27001 / PCI DSS / NIST SSDF mapping
 ├── CLAUDE.md                Maintenance rules for this repo (humans + bot)
