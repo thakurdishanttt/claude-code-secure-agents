@@ -215,4 +215,4 @@ Contributions are accepted under the same licence (Apache-2.0, section 5).
 
 ## Licence
 
-[Apache License 2.0](LICENSE) — free to use, modify and redistribute, including commercially, with attribution (see [NOTICE](NOTICE)). Copyright 2026 Alambrix.
+[Apache License 2.0](LICENSE) — free to use, modify and redistribute, including commercially, with attribution (see [NOTICE](NOTICE)). Copyright 2026 Thakur Dishant Kumar.
