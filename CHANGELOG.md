@@ -5,6 +5,7 @@
 - Fixed: the auto-update release gate crashed before grading ("Permission denied" on the hidden tests), because the runner copied its read-only pinned task files with their permissions. Task copies are now writable.
 - Evals pin the model (`--model`, default `sonnet`, or `EVAL_MODEL`); budgets are measured on it. Unpinned runs used the CLI's newer default model and went over budget. Measured on Sonnet, 3 runs each: chunk-bug $0.22–0.24, path-traversal $0.63–0.77, todo-authz $0.33–0.39, all hidden tests passing.
 - Failed hidden tests are now named in the eval output.
+- chunk-bug time budget 150 s → 240 s: measured 143–168 s on GitHub runners (47–66 s locally) at $0.12–0.14, so it was failing on runner latency, not work. Cost budget unchanged.
 - Added `SECURITY.md`, `CONTRIBUTING.md`, `CODEOWNERS`, PR and issue templates.
 - Added `docs/compliance.md`: how the kit supports SOC 2, ISO/IEC 27001:2022, PCI DSS v4.0 and NIST SSDF evidence, and what it doesn't cover.
 - Fixed: the auto-update pipeline stopped opening "pipeline failed" issues after the first one was closed, so later failures were silent. Its issue body now names the missing-secret cause.
