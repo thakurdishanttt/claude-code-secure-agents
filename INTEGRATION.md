@@ -15,7 +15,7 @@ Install time: about 2 minutes.
 
 ## 1. Requirements
 
-- **Claude Code**, used as the CLI, the VS Code / JetBrains extension, or the desktop app.
+- **Claude Code**, used as the CLI, the VS Code / JetBrains extension, or the desktop app. Use **2.1.251 or later**: earlier versions are affected by published high-severity advisories (Edit-tool TOCTOU write outside the workspace, GHSA-5xjx-9qx6-jcrv, fixed in 2.1.251; plugin commit-SHA pin bypass, GHSA-pq7j-f95f-qfcv, 2.1.179; sandbox escape via git worktree path confusion, GHSA-7835-87q9-rgvv, 2.1.163). See https://github.com/anthropics/claude-code/security/advisories.
 - **Windows:** PowerShell 5.1 or later (built in).
 - **macOS / Linux / WSL:** `bash`, plus `python3` or `node`. These are used to merge settings safely.
 - **git** on the machine, for automatic updates (optional; without it the kit works but does not self-update).
