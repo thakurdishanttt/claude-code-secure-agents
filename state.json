@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "updated": "2026-11-28T08:56:49Z",
+  "sources": {
+    "claude-code-changelog": {
+      "latest": "2.1.332"
+    },
+    "claude-code-security-advisories": {
+      "ids": [
+        "GHSA-2jjv-qf24-vfm4",
+        "GHSA-4fgq-fpq9-mr3g",
+        "GHSA-4q92-rfm6-2cqx",
+        "GHSA-4vp2-6q8c-pvq2",
+        "GHSA-5cwg-9f6j-9jvx",
+        "GHSA-5hhx-v7f6-x7gv",
+        "GHSA-5xjx-9qx6-jcrv",
+        "GHSA-66m2-gx93-v996",
+        "GHSA-66q4-vfjg-2qhh",
+        "GHSA-7835-87q9-rgvv",
+        "GHSA-7mv8-j34q-vp7q",
+        "GHSA-9f65-56v6-gxw7",
+        "GHSA-ff64-7w26-62rf",
+        "GHSA-fg94-h982-f3mm",
+        "GHSA-j4h9-wv2m-wrf7",
+        "GHSA-jh7p-qr78-84p7",
+        "GHSA-mhg7-666j-cqg4",
+        "GHSA-mmgp-wc2j-qcv7",
+        "GHSA-ph6w-f82w-28w6",
+        "GHSA-pmw4-pwvc-3hx2",
+        "GHSA-pq7j-f95f-qfcv",
+        "GHSA-q5hj-mxqh-vv77",
+        "GHSA-q728-gf8j-w49r",
+        "GHSA-qgqw-h4xq-7w8w",
+        "GHSA-qxfv-fcpc-w36x",
+        "GHSA-vhw5-3g5m-8ggf",
+        "GHSA-vp62-r36r-9xqp",
+        "GHSA-x56v-x2h6-7j34",
+        "GHSA-x5gv-jw7f-j6xj",
+        "GHSA-xq4m-mc3c-vvg3"
+      ],
+      "initialised": true
+    },
+    "claude-code-action-release": {
+      "tag": "v1"
+    },
+    "docs-subagents": {
+      "sha256": "d88d617e7f191d65ad9b6cceb7f58e4642757fb2659d4e5ba25a456cd4eb1791"
+    },
+    "docs-hooks": {
+      "sha256": "2db48a92fa10b0e679fd189d323c8913f1f4c0b116d7f774c69f5bd0b7de7498"
+    },
+    "docs-settings": {
+      "sha256": "0eebdaed28526a2b311be181a7baecfd4aff9e7839d3d7fcc0007912ff31154b"
+    },
+    "docs-slash-commands": {
+      "sha256": "de35c488a172809461dd7474827027b3b72e0c976baed4bdbd712d7095dadbd1"
+    },
+    "docs-skills": {
+      "sha256": "de35c488a172809461dd7474827027b3b72e0c976baed4bdbd712d7095dadbd1"
+    },
+    "docs-memory": {
+      "sha256": "638d478239c85e9b15e26dad2891a303c015f99c94e4c5d2e18c1020904e2dde"
+    },
+    "docs-security": {
+      "sha256": "33141411c4eb16af14ae170a7fb89bb4f6f6b0e003a61176f8952da7c8c15254"
+    },
+    "docs-iam-permissions": {
+      "sha256": "e9c6c95b28243ce1d31a728e8702519a3f1ddedb015bba68d9a2b1523127566a"
+    },
+    "owasp-llm-top10": {
+      "sha256": "2d20cdda1c42fdad5f7a4757ea4141f29d573e2e875e978d966eef8c59da7c0c"
+    },
+    "owasp-agentic-top10": {
+      "sha256": "d0f277d4a0afb882ef063510ad4cd7019f85507be948996f9d3ab1b4cf14675a"
+    },
+    "mitre-atlas-data": {
+      "tag": "v2026.11"
+    },
+    "nist-ai-rmf": {
+      "sha256": "f56591246e8c3ccf5f64dd2959aa843be85380d859d3570fa147e9531cc51e54"
+    }
+  },
+  "failures": {},
+  "last_claude_run": 1795856209.8816879
+}
